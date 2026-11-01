@@ -10,11 +10,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
 	"charm.land/lipgloss/v2"
 
 	"github.com/Beechey/outpost/internal/remote"
+	"github.com/Beechey/outpost/internal/ui"
 )
 
 const totalSteps = 6
@@ -25,24 +27,19 @@ const DevUser = "dev"
 var (
 	//go:embed scripts/bootstrap.sh
 	bootstrapScript []byte
-	//go:embed scripts/login.sh
-	loginScript []byte
 	//go:embed scripts/repos.sh
 	reposScript []byte
 
 	// No leading "-", so a host can't be read as an ssh option.
 	hostRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9.:-]*$`)
 	repoRe = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
-
-	stepStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7AA2F7"))
-	okStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#9ECE6A"))
 )
 
 // Options configures a setup run.
 type Options struct {
 	Host  string
 	Port  int
-	Repos []string // owner/name; empty means ask on the server
+	Repos []string // owner/name; empty means pick from a list
 }
 
 // Validate checks everything that ends up in a remote shell command.
@@ -53,7 +50,11 @@ func (o Options) Validate() error {
 	if o.Port < 1 || o.Port > 65535 {
 		return fmt.Errorf("port %d is out of range", o.Port)
 	}
-	for _, r := range o.Repos {
+	return validateRepos(o.Repos)
+}
+
+func validateRepos(repos []string) error {
+	for _, r := range repos {
 		if !repoRe.MatchString(r) {
 			return fmt.Errorf("%q isn't a repo name like owner/name", r)
 		}
@@ -69,42 +70,80 @@ func Run(ctx context.Context, o Options) error {
 	srv := remote.Server{Host: o.Host, Port: o.Port}
 	lipgloss.Println("\n" + banner)
 
-	step(1, "Checking your SSH key")
+	ui.Header(1, totalSteps, "SSH key")
 	if err := ensureKey(ctx); err != nil {
 		return fmt.Errorf("create SSH key: %w", err)
 	}
 
-	step(2, "Connecting to "+o.Host)
+	ui.Header(2, totalSteps, "Connecting to "+o.Host)
 	admin, err := adminUser(ctx, srv)
 	if err != nil {
 		return err
 	}
+	lipgloss.Println("  " + ui.Muted.Render("Logged in as "+admin))
 
-	step(3, "Installing everything (3-5 minutes)")
-	if err := srv.RunScript(ctx, admin, bootstrapScript, "sudo bash"); err != nil {
-		return fmt.Errorf("server install failed, see the output above: %w", err)
+	ui.Header(3, totalSteps, "Installing (3-5 minutes)")
+	install := remote.Script{Body: bootstrapScript, Runner: "sudo bash"}
+	if err := runTasks(ctx, srv, admin, install); err != nil {
+		return fmt.Errorf("the install failed (see above). Run the same command again to retry: %w", err)
 	}
 
-	step(4, "Logins: approve each link on your laptop")
-	if err := srv.RunScript(ctx, DevUser, loginScript, "bash"); err != nil {
-		return fmt.Errorf("a login failed, see the output above, then run the same command again: %w", err)
+	ui.Header(4, totalSteps, "Logins")
+	if err := runLogins(ctx, srv); err != nil {
+		return err
 	}
 
-	step(5, "Cloning your repos into T3")
-	if err := srv.RunScript(ctx, DevUser, reposScript, "bash", o.Repos...); err != nil {
-		return fmt.Errorf("repo setup failed, see the output above: %w", err)
+	ui.Header(5, totalSteps, "Repos")
+	repos := o.Repos
+	if len(repos) == 0 {
+		if repos, err = pickRepos(ctx, srv); err != nil {
+			return err
+		}
+	}
+	if len(repos) == 0 {
+		lipgloss.Println("  " + ui.Muted.Render("Skipped. Add repos any time: outpost setup "+o.Host+" owner/repo"))
+	} else if err := runTasks(ctx, srv, DevUser, remote.Script{Body: reposScript, Runner: "bash", Args: repos}); err != nil {
+		return fmt.Errorf("repo setup failed (see above): %w", err)
 	}
 
-	step(6, "Rebooting to check everything comes back by itself")
+	ui.Header(6, totalSteps, "Reboot check")
 	if err := rebootCheck(ctx, srv); err != nil {
 		return err
 	}
-	lipgloss.Println(okStyle.Render("\nAll set.") + " Open T3 Code, pick this server, and start prompting.")
+
+	lipgloss.Println("\n" + doneBox.Render(
+		ui.Accent.Render("✓ All set.")+" "+ui.Bold.Render(o.Host)+" is ready for your agents.\n\n"+
+			"Open T3 Code, pick this server under Settings → Environments,\n"+
+			"choose a project, and start prompting."))
 	return nil
 }
 
-func step(n int, msg string) {
-	lipgloss.Println(stepStyle.Render(fmt.Sprintf("\n[%d/%d] %s", n, totalSteps, msg)))
+var doneBox = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#4ADE80")).Padding(0, 2)
+
+// runTasks runs a script that announces its stages as "::task <name>" lines,
+// showing them as live progress. Other output is hidden, but the last lines are
+// shown if the script fails.
+func runTasks(ctx context.Context, srv remote.Server, user string, sc remote.Script) error {
+	const keep = 25
+	var tail []string
+	p := ui.NewProgress()
+	err := srv.RunStreaming(ctx, user, sc, func(line string) {
+		if name, ok := strings.CutPrefix(line, "::task "); ok {
+			p.Task(name)
+			return
+		}
+		if tail = append(tail, line); len(tail) > keep {
+			tail = tail[1:]
+		}
+	})
+	p.Done(err)
+	if err != nil && len(tail) > 0 {
+		lipgloss.Println("\n  " + ui.Muted.Render("Last output from the server:"))
+		for _, l := range tail {
+			fmt.Println("  │ " + l)
+		}
+	}
+	return err
 }
 
 // adminUser picks who runs the install: root on a fresh server, or dev on a
@@ -116,7 +155,7 @@ func adminUser(ctx context.Context, srv remote.Server) (string, error) {
 	if srv.CanLogin(ctx, "root") {
 		return "root", nil
 	}
-	fmt.Println("Your SSH key isn't on the server yet. Enter the root password from your provider:")
+	fmt.Println("  Your SSH key isn't on the server yet. Enter the root password from your provider:")
 	if err := srv.CopyID(ctx, "root"); err != nil || !srv.CanLogin(ctx, "root") {
 		return "", fmt.Errorf("can't log in as root: check the address and password. "+
 			"If you reinstalled the server, first run: ssh-keygen -R %s", srv.Host)
@@ -124,11 +163,17 @@ func adminUser(ctx context.Context, srv remote.Server) (string, error) {
 	return "root", nil
 }
 
-func rebootCheck(ctx context.Context, srv remote.Server) error {
-	_ = srv.Run(ctx, DevUser, "sudo systemctl reboot") // the connection drops as the server goes down
+func rebootCheck(ctx context.Context, srv remote.Server) (err error) {
+	p := ui.NewProgress()
+	defer func() { p.Done(err) }()
+
+	p.Task("Rebooting")
+	_ = srv.Run(ctx, DevUser, "sudo systemctl reboot >/dev/null 2>&1") // the connection drops as the server goes down
 	if err := sleep(ctx, 15*time.Second); err != nil {
 		return err
 	}
+
+	p.Task("Waiting for the server to come back")
 	deadline := time.Now().Add(5 * time.Minute)
 	for !srv.CanLogin(ctx, DevUser) {
 		if time.Now().After(deadline) {
@@ -138,9 +183,12 @@ func rebootCheck(ctx context.Context, srv remote.Server) error {
 			return err
 		}
 	}
-	if err := srv.Run(ctx, DevUser,
-		"systemctl is-active docker tailscaled && systemctl --user is-active t3code.service"); err != nil {
-		return errors.New("something didn't start after the reboot (see above); run the same command again to repair it")
+
+	p.Task("T3 Code, Docker and Tailscale started by themselves")
+	out, err := srv.Output(ctx, DevUser,
+		"systemctl is-active docker tailscaled && systemctl --user is-active t3code.service")
+	if err != nil {
+		return fmt.Errorf("something didn't start after the reboot: %s\nRun the same command again to repair it", strings.TrimSpace(string(out)))
 	}
 	return nil
 }
@@ -161,10 +209,10 @@ func ensureKey(ctx context.Context) error {
 	}
 	key := filepath.Join(home, ".ssh", "id_ed25519")
 	if _, err := os.Stat(key + ".pub"); err == nil {
-		fmt.Println("Using", key+".pub")
+		lipgloss.Println("  " + ui.Muted.Render("Using "+key+".pub"))
 		return nil
 	}
-	fmt.Println("No SSH key yet, creating one. Press Enter at each question.")
+	fmt.Println("  No SSH key yet, creating one. Press Enter at each question.")
 	gen := exec.CommandContext(ctx, "ssh-keygen", "-t", "ed25519", "-f", key)
 	gen.Stdin, gen.Stdout, gen.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return gen.Run()

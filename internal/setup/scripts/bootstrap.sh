@@ -1,31 +1,40 @@
 #!/usr/bin/env bash
 # Turns a fresh Ubuntu 24.04 machine into a T3 Code agent box. Safe to re-run.
-# Run for you by `outpost setup`. Logins and repos happen afterwards in finish.sh.
+# Run for you by `outpost setup`, which shows each "::task" line as a progress step.
+# Logins and repos happen afterwards in login.sh and repos.sh.
 set -euo pipefail
+task() { echo "::task $*"; }
+# Retry downloads: a flaky connection shouldn't fail the whole install.
+fetch() { curl -fsSL --retry 5 --retry-delay 2 --retry-all-errors "$@"; }
 
 DEV_USER="${DEV_USER:-dev}"
 [ "$(id -u)" -eq 0 ] || { echo "Run as root (sudo bash bootstrap.sh)"; exit 1; }
 export DEBIAN_FRONTEND=noninteractive
 
+task "System packages"
 apt-get update
 apt-get install -y git gh curl ca-certificates build-essential unzip jq ripgrep tmux ufw
 
+task "Node.js"
 # Node for your projects (T3 itself ships its own runtime)
 if ! command -v node >/dev/null; then
-  curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
+  fetch https://deb.nodesource.com/setup_24.x | bash -
   apt-get install -y nodejs
 fi
 
+task "Docker"
 # Docker publishes ports past ufw, so bind published ports to localhost by default.
 # Otherwise an agent's `docker run -p 5432:5432 postgres` is open to the internet.
 mkdir -p /etc/docker
 [ -f /etc/docker/daemon.json ] || echo '{ "ip": "127.0.0.1" }' > /etc/docker/daemon.json
-command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh
+command -v docker >/dev/null || fetch https://get.docker.com | sh
 systemctl enable docker && systemctl restart docker
 
-command -v tailscale >/dev/null || curl -fsSL https://tailscale.com/install.sh | sh
+task "Tailscale"
+command -v tailscale >/dev/null || fetch https://tailscale.com/install.sh | sh
 systemctl enable --now tailscaled
 
+task "User and SSH"
 # Non-root user that runs T3 and the agents (T3's browser sandbox refuses root).
 if ! id "$DEV_USER" >/dev/null 2>&1; then
   useradd -m -s /bin/bash -G sudo "$DEV_USER"
@@ -45,27 +54,27 @@ fi
 
 # Key-only SSH, but only once the dev user has a key, so you can't lock yourself out.
 if [ -s "$HOME_DIR/.ssh/authorized_keys" ]; then
-  printf 'PasswordAuthentication no\nPermitRootLogin no\n' > /etc/ssh/sshd_config.d/10-devbox.conf
+  printf 'PasswordAuthentication no\nPermitRootLogin no\n' > /etc/ssh/sshd_config.d/10-outpost.conf
   systemctl reload ssh
 else
   echo "WARNING: $DEV_USER has no SSH key; password login left on. Add a key and re-run."
 fi
 
+task "Firewall"
 ufw allow OpenSSH
 ufw allow in on tailscale0
 ufw --force enable
 
+task "T3 Code and Claude Code"
 # Per-user tools, installed into ~/.local/bin
 sudo -iu "$DEV_USER" bash <<'EOF'
 set -euo pipefail
 export PATH="$HOME/.local/bin:$PATH"
-command -v t3 >/dev/null || curl -fsSL https://t3.codes/install.sh | sh
-command -v claude >/dev/null || curl -fsSL https://claude.ai/install.sh | bash
+fetch() { curl -fsSL --retry 5 --retry-delay 2 --retry-all-errors "$@"; }
+command -v t3 >/dev/null || fetch https://t3.codes/install.sh | sh
+command -v claude >/dev/null || fetch https://claude.ai/install.sh | bash
 grep -q '.local/bin' ~/.bashrc || echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 # So T3's background service can find claude, t3 and friends after a reboot.
 mkdir -p ~/.config/environment.d
 echo 'PATH=${HOME}/.local/bin:${PATH}' > ~/.config/environment.d/10-outpost.conf
 EOF
-
-echo
-echo "outpost: server install done."

@@ -6,7 +6,7 @@
 # shellcheck disable=SC2016 # single-quoted commands are meant to expand on the server
 set -euo pipefail
 cd "$(dirname "$0")"
-NAME=outpost-e2e PORT=2222 SCRIPTS=../../internal/setup/scripts
+NAME=outpost-e2e PORT=2299 SCRIPTS=../../internal/setup/scripts
 SSH=(ssh -p "$PORT" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR)
 
 cleanup() { docker rm -f "$NAME" >/dev/null 2>&1 || true; }

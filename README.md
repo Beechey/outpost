@@ -19,15 +19,26 @@
 ---
 
 ```console
-$ outpost setup 203.0.113.7 you/app you/api
-[1/6] Checking your SSH key
-[2/6] Connecting to 203.0.113.7
-[3/6] Installing everything (3-5 minutes)
-[4/6] Logins: approve each link on your laptop
-[5/6] Cloning your repos into T3
-[6/6] Rebooting to check everything comes back by itself
+$ outpost setup 203.0.113.7
 
-All set. Open T3 Code, pick this server, and start prompting.
+3/6  Installing (3-5 minutes)
+  ✓ System packages 41s
+  ✓ Node.js 12s
+  ✓ Docker 38s
+  ✓ Tailscale 9s
+  ✓ User and SSH 1s
+  ✓ Firewall 2s
+  ⠼ T3 Code and Claude Code
+
+4/6  Logins
+  ✓ Tailscale already signed in
+  ◆ Claude  Open the link, approve, then paste the code back here.
+
+5/6  Repos
+┃ Which repos should your agents work on?
+┃ > ✓ you/app (private) · The main app
+┃   ✓ your-org/api (private)
+┃   • you/dotfiles
 ```
 
 Your agents keep working while your laptop is closed. You check in from your laptop or phone through T3 Code. The server comes back by itself after any reboot.
@@ -109,7 +120,7 @@ It then walks you through these, in order:
 | **Claude** | Open the link, approve, and paste the code back into the terminal. |
 | **GitHub** | Copy the code shown, press Enter, open the link, and paste the code. |
 | **T3 Connect** | Open the link, check the code matches, and approve. |
-| Repos | If you didn't list any, pick from your GitHub repos, or press Enter to skip. |
+| **Repos** | Tick repos from a list of everything your GitHub account can see, including organizations. Space to select, `/` to filter, Enter to confirm. |
 
 Then it reboots the server and checks everything comes back. When you see **All set**, open T3 Code: the server appears next to your laptop under **Settings → Environments**.
 
@@ -148,7 +159,7 @@ A free T3 Connect account links up to 3 machines, so remove servers you no longe
 |---|---|
 | **T3 Code** | Background service that starts at boot (systemd user service with lingering) |
 | **Claude Code** | Native install, signed in with your Claude account |
-| **GitHub CLI + git** | Signed in; git uses it for credentials, so private repos work |
+| **GitHub CLI + git** | Signed in; git uses it for credentials, so private repos work. outpost supports GitHub only for now |
 | **Node.js 24** | For your projects |
 | **Docker** | For databases and services your projects need |
 | **Tailscale** | Private network between your devices, with Tailscale SSH |
@@ -193,12 +204,14 @@ T3 Code supports them. Install and sign in to the agent's CLI on the server as `
 
 ```
 cmd/outpost/          CLI entry point (cobra + fang)
-internal/setup/       The setup steps; validates everything that reaches a remote shell
+internal/setup/       The six setup steps; validates everything that reaches a remote shell
+  logins.go           Tailscale, Claude, GitHub and T3 Connect sign-ins (skipped when done)
+  repos.go            The repo picker
   scripts/            Shell scripts embedded in the binary and run on the server
     bootstrap.sh      As root: packages, user, SSH, firewall, Docker, Tailscale, T3, Claude
-    login.sh          As dev: Tailscale, Claude, GitHub, T3 Connect logins
     repos.sh          As dev: clone repos and add them as T3 projects
 internal/remote/      Runs commands over the system ssh binary
+internal/ui/          Step headers and live progress
 test/e2e/             End-to-end test against a systemd container posing as a fresh VPS
 ```
 

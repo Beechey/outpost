@@ -1,0 +1,63 @@
+package setup
+
+import (
+	"context"
+	"fmt"
+
+	"charm.land/lipgloss/v2"
+
+	"github.com/Beechey/outpost/internal/remote"
+	"github.com/Beechey/outpost/internal/ui"
+)
+
+// A login signs the server in to one account. Done is a remote check that
+// succeeds when it's already signed in; Run signs in, prompting the user.
+type login struct {
+	Name, Done, Run, Hint string
+}
+
+var logins = []login{
+	{
+		Name: "Tailscale",
+		Done: "tailscale status >/dev/null 2>&1",
+		Run:  "sudo tailscale up --ssh",
+		Hint: "Open the link and sign in with the same account as your laptop.",
+	},
+	{
+		Name: "Claude",
+		Done: `claude auth status 2>/dev/null | grep -q '"loggedIn": true'`,
+		Run:  "claude auth login",
+		Hint: "Open the link, approve, then paste the code back here.",
+	},
+	{
+		Name: "GitHub",
+		// setup-git lets plain git use these credentials, so private repos clone.
+		Done: "gh auth status >/dev/null 2>&1 && gh auth setup-git",
+		// The server has no browser; GH_BROWSER=true stops gh trying to open one.
+		Run:  "GH_BROWSER=true gh auth login --hostname github.com --git-protocol https --web && gh auth setup-git",
+		Hint: "Open github.com/login/device on your laptop and enter the code below.",
+	},
+	{
+		Name: "T3 Connect",
+		Done: "t3 status --json | jq -e '.connect.enabled and .service.installed' >/dev/null",
+		Run:  "t3 up --connect --yes",
+		Hint: "Open the link, check the code matches, and approve.",
+	},
+}
+
+const userPath = `export PATH="$HOME/.local/bin:$PATH"; `
+
+func runLogins(ctx context.Context, srv remote.Server) error {
+	for _, l := range logins {
+		if _, err := srv.Output(ctx, DevUser, userPath+l.Done); err == nil {
+			lipgloss.Println("  " + ui.Accent.Render("✓") + " " + l.Name + " " + ui.Muted.Render("already signed in"))
+			continue
+		}
+		lipgloss.Println("\n  " + ui.Accent.Render("◆") + " " + ui.Bold.Render(l.Name) + "  " + ui.Muted.Render(l.Hint))
+		if err := srv.Interactive(ctx, DevUser, userPath+l.Run); err != nil {
+			return fmt.Errorf("%s sign-in didn't finish. Run the same command again to retry: %w", l.Name, err)
+		}
+		lipgloss.Println("  " + ui.Accent.Render("✓") + " " + l.Name + " " + ui.Muted.Render("signed in"))
+	}
+	return nil
+}

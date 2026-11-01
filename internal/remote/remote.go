@@ -3,9 +3,11 @@
 package remote
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strconv"
@@ -49,19 +51,64 @@ func (s Server) Run(ctx context.Context, user, remoteCmd string) error {
 	return cmd.Run()
 }
 
-// RunScript uploads script and runs it as `runner <path> args...` with a
-// terminal attached, so the script can prompt. The remote shell sees args
-// unquoted, so callers must validate them.
-func (s Server) RunScript(ctx context.Context, user string, script []byte, runner string, args ...string) error {
-	path := fmt.Sprintf("/tmp/outpost-%d.sh", time.Now().UnixNano())
-	upload := s.command(ctx, user, nil, "cat > "+path)
-	upload.Stdin, upload.Stderr = bytes.NewReader(script), os.Stderr
-	if err := upload.Run(); err != nil {
-		return fmt.Errorf("upload script: %w", err)
+// Output runs remoteCmd and returns its stdout, even when it fails.
+func (s Server) Output(ctx context.Context, user, remoteCmd string) ([]byte, error) {
+	var stderr bytes.Buffer
+	cmd := s.command(ctx, user, nil, remoteCmd)
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil {
+		err = fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
 	}
-	run := strings.Join(append([]string{runner, path}, args...), " ")
-	// Clean up the script but keep its exit status.
-	return attach(s.command(ctx, user, []string{"-t"}, run+"; s=$?; rm -f "+path+"; exit $s")).Run()
+	return out, err
+}
+
+// Script is a shell script to run on the server as `Runner <script> Args...`.
+// The remote shell sees Args unquoted, so callers must validate them.
+type Script struct {
+	Body   []byte
+	Runner string // e.g. "bash" or "sudo bash"
+	Args   []string
+}
+
+// Interactive runs remoteCmd with a terminal attached, so it can prompt.
+func (s Server) Interactive(ctx context.Context, user, remoteCmd string) error {
+	return attach(s.command(ctx, user, []string{"-t"}, remoteCmd)).Run()
+}
+
+// RunStreaming runs script without a terminal, calling onLine for each line of
+// combined stdout and stderr.
+func (s Server) RunStreaming(ctx context.Context, user string, sc Script, onLine func(string)) error {
+	remoteCmd, err := s.upload(ctx, user, sc)
+	if err != nil {
+		return err
+	}
+	cmd := s.command(ctx, user, nil, remoteCmd)
+	pr, pw := io.Pipe()
+	cmd.Stdout, cmd.Stderr = pw, pw
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	go func() { pw.CloseWithError(cmd.Wait()) }()
+	scan := bufio.NewScanner(pr)
+	scan.Buffer(make([]byte, 64*1024), 1024*1024)
+	for scan.Scan() {
+		onLine(scan.Text())
+	}
+	return scan.Err() // the exit error from Wait, via CloseWithError
+}
+
+// upload copies the script to the server and returns the command that runs it
+// and then deletes it, keeping its exit status.
+func (s Server) upload(ctx context.Context, user string, sc Script) (string, error) {
+	path := fmt.Sprintf("/tmp/outpost-%d.sh", time.Now().UnixNano())
+	up := s.command(ctx, user, nil, "cat > "+path)
+	up.Stdin = bytes.NewReader(sc.Body)
+	if out, err := up.CombinedOutput(); err != nil {
+		return "", fmt.Errorf("upload script: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+	run := strings.Join(append([]string{sc.Runner, path}, sc.Args...), " ")
+	return run + "; s=$?; rm -f " + path + "; exit $s", nil
 }
 
 func attach(cmd *exec.Cmd) *exec.Cmd {
