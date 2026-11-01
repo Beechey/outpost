@@ -98,12 +98,12 @@ func Run(ctx context.Context, o Options) error {
 	if err := rebootCheck(ctx, srv); err != nil {
 		return err
 	}
-	fmt.Println(okStyle.Render("\nAll set.") + " Open T3 Code, pick this server, and start prompting.")
+	lipgloss.Println(okStyle.Render("\nAll set.") + " Open T3 Code, pick this server, and start prompting.")
 	return nil
 }
 
 func step(n int, msg string) {
-	fmt.Println(stepStyle.Render(fmt.Sprintf("\n[%d/%d] %s", n, totalSteps, msg)))
+	lipgloss.Println(stepStyle.Render(fmt.Sprintf("\n[%d/%d] %s", n, totalSteps, msg)))
 }
 
 // adminUser picks who runs the install: root on a fresh server, or dev on a
