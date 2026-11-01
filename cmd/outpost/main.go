@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime/debug"
 	"slices"
 	"strings"
 	"syscall"
@@ -19,6 +20,7 @@ import (
 	"github.com/Beechey/outpost/internal/remote"
 	"github.com/Beechey/outpost/internal/servers"
 	"github.com/Beechey/outpost/internal/setup"
+	"github.com/Beechey/outpost/internal/ui"
 )
 
 func main() {
@@ -332,7 +334,7 @@ func forgetCmd() *cobra.Command {
 }
 
 // module is where outpost installs from.
-const module = "github.com/Beechey/outpost/cmd/outpost"
+const module = "github.com/Beechey/outpost"
 
 func upgradeCmd() *cobra.Command {
 	return &cobra.Command{
@@ -345,29 +347,66 @@ func upgradeCmd() *cobra.Command {
 			if _, err := exec.LookPath("go"); err != nil {
 				return errors.New("outpost upgrades itself with Go, which isn't on your PATH. Install it from https://go.dev/dl/, then run this again")
 			}
-			install := exec.CommandContext(cmd.Context(), "go", "install", module+"@latest")
-			install.Stdout, install.Stderr = os.Stdout, os.Stderr
-			// Go's module cache can serve an older @latest for a while after a push; with git, ask GitHub directly.
-			if _, err := exec.LookPath("git"); err == nil {
-				install.Env = append(os.Environ(), "GOPROXY=direct")
+			current := "a development build"
+			if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "(devel)" {
+				current = info.Main.Version
 			}
-			if err := install.Run(); err != nil {
+			latest, err := installLatest(cmd.Context(), current)
+			if err != nil {
 				return fmt.Errorf("upgrade failed: %w", err)
 			}
+			if latest == current {
+				ui.Check("outpost is up to date", latest)
+				return nil
+			}
+			ui.Check("Upgraded outpost", "from "+current+" to "+latest)
 			bin, err := goBin(cmd)
 			if err != nil {
 				return err
 			}
-			installed := filepath.Join(bin, "outpost")
-			version, _ := exec.CommandContext(cmd.Context(), installed, "--version").Output()
-			fmt.Print("Upgraded: " + string(version))
 			// go install writes to Go's bin folder; an outpost run from elsewhere stays as it was.
+			installed := filepath.Join(bin, "outpost")
 			if self, err := os.Executable(); err == nil && filepath.Clean(self) != filepath.Clean(installed) {
-				fmt.Printf("The new outpost is %s, but you ran %s. Put %s first on your PATH.\n", installed, self, bin)
+				fmt.Printf("  The new outpost is %s, but you ran %s. Put %s first on your PATH.\n", installed, self, bin)
 			}
 			return nil
 		},
 	}
+}
+
+// installLatest installs the newest outpost unless current already is it,
+// showing progress, and returns the newest version.
+func installLatest(ctx context.Context, current string) (latest string, err error) {
+	p := ui.NewProgress()
+	defer func() { p.Done(err) }()
+	p.Task("Finding the newest outpost")
+	out, err := goRun(ctx, "list", "-m", "-f", "{{.Version}}", module+"@latest")
+	if err != nil {
+		return "", err
+	}
+	if latest = strings.TrimSpace(string(out)); latest == current {
+		return latest, nil
+	}
+	p.Task("Downloading and installing " + latest)
+	_, err = goRun(ctx, "install", module+"/cmd/outpost@"+latest)
+	return latest, err
+}
+
+// goRun runs a go command quietly, returning its output, or its error output in the error.
+func goRun(ctx context.Context, args ...string) ([]byte, error) {
+	c := exec.CommandContext(ctx, "go", args...)
+	c.Dir = os.TempDir() // outside any Go project, whose go.mod would change the answer
+	// Go's module cache can serve an older @latest for a while after a push; with git, ask GitHub directly.
+	if _, err := exec.LookPath("git"); err == nil {
+		c.Env = append(os.Environ(), "GOPROXY=direct")
+	}
+	var stderr strings.Builder
+	c.Stderr = &stderr
+	out, err := c.Output()
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
+	}
+	return out, nil
 }
 
 // goBin is the folder go install writes to.
