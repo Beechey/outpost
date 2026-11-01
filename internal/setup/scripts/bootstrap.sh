@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 # Turns a fresh Ubuntu 24.04 machine into a T3 Code agent box. Safe to re-run.
-# Usage, from your laptop (see README.md):
-#   scp bootstrap.sh root@SERVER_IP:  &&  ssh -t root@SERVER_IP bash bootstrap.sh
-# Logins (Tailscale, Claude, GitHub, T3 Connect) need a browser, so they are printed at the end.
+# Run for you by `outpost setup`. Logins and repos happen afterwards in finish.sh.
 set -euo pipefail
 
 DEV_USER="${DEV_USER:-dev}"
@@ -33,6 +31,9 @@ if ! id "$DEV_USER" >/dev/null 2>&1; then
   useradd -m -s /bin/bash -G sudo "$DEV_USER"
 fi
 usermod -aG docker "$DEV_USER"
+# Passwordless sudo: dev already controls the box via the docker group, so a password adds friction, not safety.
+echo "$DEV_USER ALL=(ALL) NOPASSWD:ALL" > /tmp/outpost-sudoers
+visudo -cf /tmp/outpost-sudoers && install -m 440 /tmp/outpost-sudoers /etc/sudoers.d/outpost
 loginctl enable-linger "$DEV_USER" # keeps T3's user service running after logout
 HOME_DIR="$(getent passwd "$DEV_USER" | cut -d: -f6)"
 
@@ -61,24 +62,10 @@ export PATH="$HOME/.local/bin:$PATH"
 command -v t3 >/dev/null || curl -fsSL https://t3.codes/install.sh | sh
 command -v claude >/dev/null || curl -fsSL https://claude.ai/install.sh | bash
 grep -q '.local/bin' ~/.bashrc || echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+# So T3's background service can find claude, t3 and friends after a reboot.
+mkdir -p ~/.config/environment.d
+echo 'PATH=${HOME}/.local/bin:${PATH}' > ~/.config/environment.d/10-outpost.conf
 EOF
 
-# Root SSH is now off, so give the dev user a sudo password while we still have a root shell.
-if [ -t 0 ] && passwd -S "$DEV_USER" | awk '{exit !($2=="L" || $2=="NP")}'; then
-  echo "Choose a password for $DEV_USER (used for sudo, not for SSH):"
-  passwd "$DEV_USER"
-fi
-
-cat <<EOF
-
-Done. Now log in as $DEV_USER and finish the logins (README.md, step 3):
-  ssh $DEV_USER@<this-box>
-  sudo tailscale up --ssh
-  claude auth login
-  gh auth login
-  t3 connect
-
-Then test a reboot:  sudo reboot  (wait a minute, and the box should show up in T3 again)
-Check boot startup any time with:  t3 service status   (want: running, enabled, linger yes)
-For agent-started containers, use restart: unless-stopped in docker compose files.
-EOF
+echo
+echo "outpost: server install done."
