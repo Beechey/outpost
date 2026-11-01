@@ -208,6 +208,30 @@ shellcheck internal/setup/scripts/*.sh test/e2e/run.sh
 test/e2e/run.sh          # full install + reboot in Docker (about 5 minutes; needs Docker and ~/.ssh/id_ed25519)
 ```
 
+### Try the full flow locally
+
+Run the real thing, logins included, against a container that acts like a fresh server:
+
+```bash
+cd test/e2e
+docker build -t outpost-try --build-arg PUBKEY="$(cat ~/.ssh/id_ed25519.pub)" .
+docker run -d --name outpost-try --privileged --cgroupns=host \
+  -v /sys/fs/cgroup:/sys/fs/cgroup:rw -v /var/lib/docker -v /var/lib/containerd \
+  --restart unless-stopped -p 2222:22 outpost-try
+outpost setup -p 2222 localhost
+```
+
+Clean up afterwards:
+
+```bash
+docker rm -f outpost-try
+ssh-keygen -R "[localhost]:2222"
+```
+
+Then remove the test machine from the [Tailscale admin console](https://login.tailscale.com/admin/machines) and from T3 Code (**Settings → Environments**), so it doesn't use one of your 3 T3 Connect slots.
+
+### Automated end-to-end test
+
 The end-to-end test runs every script for real, except the logins (they need a human). It then reboots the container and checks T3, Docker and Tailscale all come back.
 
 ## License
