@@ -4,7 +4,7 @@
 
 <h1 align="center">outpost</h1>
 
-<h3 align="center">Always-on servers for your AI coding agents.</h3>
+<h3 align="center">Turn any server into an always-on home for your AI coding agents.</h3>
 
 <p align="center">
   One command turns a fresh server into a secure, signed-in home for your agents, ready for <a href="https://t3.codes">T3 Code</a>.<br>

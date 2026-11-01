@@ -32,7 +32,7 @@ func main() {
 func rootCmd() *cobra.Command {
 	root := &cobra.Command{
 		Use:   "outpost",
-		Short: "Always-on servers for your AI coding agents, ready for T3 Code",
+		Short: "Turn any server into an always-on home for your AI coding agents, ready for T3 Code",
 		Long: "outpost turns a fresh Ubuntu server into a home for your agents, and moves\n" +
 			"everything to a new server when you switch providers.\n\n" +
 			"Servers are written as an IP address or hostname, with :port if SSH isn't on 22.\n" +
