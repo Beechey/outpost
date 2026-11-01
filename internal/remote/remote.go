@@ -10,12 +10,14 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 )
 
-// Server is an SSH-reachable machine.
+// Server is an SSH-reachable machine. Port 0 leaves the port to ssh, so
+// ~/.ssh/config applies; otherwise it's 22.
 type Server struct {
 	Host string
 	Port int
@@ -24,7 +26,10 @@ type Server struct {
 var baseOpts = []string{"-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=10"}
 
 func (s Server) sshArgs(extra ...string) []string {
-	args := append([]string{"-p", strconv.Itoa(s.Port)}, baseOpts...)
+	args := slices.Clone(baseOpts)
+	if s.Port != 0 {
+		args = append(args, "-p", strconv.Itoa(s.Port))
+	}
 	return append(args, extra...)
 }
 
@@ -109,6 +114,55 @@ func (s Server) upload(ctx context.Context, user string, sc Script) (string, err
 	}
 	run := strings.Join(append([]string{sc.Runner, path}, sc.Args...), " ")
 	return run + "; s=$?; rm -f " + path + "; exit $s", nil
+}
+
+// Copy pipes the output of srcCmd on src straight into dstCmd on dst, both as
+// user, calling progress with the running byte count.
+func Copy(ctx context.Context, src, dst Server, user, srcCmd, dstCmd string, progress func(int64)) error {
+	var srcErr, dstErr bytes.Buffer
+	from := src.command(ctx, user, nil, srcCmd)
+	from.Stderr = &srcErr
+	out, err := from.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	to := dst.command(ctx, user, nil, dstCmd)
+	to.Stderr = &dstErr
+	in, err := to.StdinPipe()
+	if err != nil {
+		return err
+	}
+	if err := to.Start(); err != nil {
+		return err
+	}
+	if err := from.Start(); err != nil {
+		in.Close()
+		_ = to.Wait()
+		return err
+	}
+	_, copyErr := io.Copy(in, &countingReader{r: out, progress: progress})
+	in.Close() // end of input for dstCmd
+	fromErr, toErr := from.Wait(), to.Wait()
+	switch {
+	case fromErr != nil:
+		return fmt.Errorf("read from %s: %w: %s", src.Host, fromErr, strings.TrimSpace(srcErr.String()))
+	case toErr != nil:
+		return fmt.Errorf("write to %s: %w: %s", dst.Host, toErr, strings.TrimSpace(dstErr.String()))
+	}
+	return copyErr
+}
+
+type countingReader struct {
+	r        io.Reader
+	n        int64
+	progress func(int64)
+}
+
+func (c *countingReader) Read(p []byte) (int, error) {
+	n, err := c.r.Read(p)
+	c.n += int64(n)
+	c.progress(c.n)
+	return n, err
 }
 
 func attach(cmd *exec.Cmd) *exec.Cmd {

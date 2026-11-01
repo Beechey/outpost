@@ -1,4 +1,4 @@
-// Package setup turns a fresh Ubuntu server into an always-on T3 Code agent box.
+// Package setup prepares servers for T3 Code and moves them between machines.
 package setup
 
 import (
@@ -19,109 +19,105 @@ import (
 	"github.com/Beechey/outpost/internal/ui"
 )
 
-const totalSteps = 6
-
 // DevUser runs T3 Code and the agents. It must match DEV_USER in bootstrap.sh.
 const DevUser = "dev"
 
 var (
 	//go:embed scripts/bootstrap.sh
 	bootstrapScript []byte
-	//go:embed scripts/repos.sh
-	reposScript []byte
 
 	// No leading "-", so a host can't be read as an ssh option.
 	hostRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9.:-]*$`)
-	repoRe = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
 )
 
-// Options configures a setup run.
-type Options struct {
-	Host  string
-	Port  int
-	Repos []string // owner/name; empty means pick from a list
-}
-
-// Validate checks everything that ends up in a remote shell command.
-func (o Options) Validate() error {
-	if !hostRe.MatchString(o.Host) {
-		return fmt.Errorf("%q doesn't look like a server address", o.Host)
+func validateServer(host string, port int) error {
+	if !hostRe.MatchString(host) {
+		return fmt.Errorf("%q doesn't look like a server address", host)
 	}
-	if o.Port < 1 || o.Port > 65535 {
-		return fmt.Errorf("port %d is out of range", o.Port)
-	}
-	return validateRepos(o.Repos)
-}
-
-func validateRepos(repos []string) error {
-	for _, r := range repos {
-		if !repoRe.MatchString(r) {
-			return fmt.Errorf("%q isn't a repo name like owner/name", r)
-		}
+	if port < 0 || port > 65535 {
+		return fmt.Errorf("port %d is out of range", port)
 	}
 	return nil
 }
 
-// Run performs the full setup. It is safe to re-run on a finished server.
+// Options configures a setup run.
+type Options struct {
+	Host string
+	Port int // 0 means ssh decides: ~/.ssh/config, else 22
+}
+
+// Run prepares a server for T3 Code. It is safe to re-run on a finished server.
 func Run(ctx context.Context, o Options) error {
-	if err := o.Validate(); err != nil {
+	if err := validateServer(o.Host, o.Port); err != nil {
 		return err
 	}
 	srv := remote.Server{Host: o.Host, Port: o.Port}
 	lipgloss.Println("\n" + banner)
+	st := &steps{total: 5}
 
-	ui.Header(1, totalSteps, "SSH key")
+	st.next("SSH key")
 	if err := ensureKey(ctx); err != nil {
 		return fmt.Errorf("create SSH key: %w", err)
 	}
-
-	ui.Header(2, totalSteps, "Connecting to "+o.Host)
-	admin, err := adminUser(ctx, srv)
+	st.next("Connecting to " + o.Host)
+	admin, inUse, err := connect(ctx, srv)
 	if err != nil {
 		return err
 	}
-	lipgloss.Println("  " + ui.Muted.Render("Logged in as "+admin))
-	// A server that already runs T3 may have agents working, so re-runs check health instead of rebooting.
-	inUse := admin == DevUser && srvOK(ctx, srv, "t3 status --json | jq -e .service.installed")
-
-	ui.Header(3, totalSteps, "Installing (3-5 minutes)")
-	install := remote.Script{Body: bootstrapScript, Runner: "sudo bash"}
-	if err := runTasks(ctx, srv, admin, install); err != nil {
-		return fmt.Errorf("the install failed (see above). Run the same command again to retry: %w", err)
+	st.next("Installing (3-5 minutes)")
+	if err := install(ctx, srv, admin); err != nil {
+		return err
 	}
-
-	ui.Header(4, totalSteps, "Logins")
+	st.next("Logins")
 	if err := runLogins(ctx, srv); err != nil {
 		return err
 	}
-
-	ui.Header(5, totalSteps, "Repos")
-	repos := o.Repos
-	if len(repos) == 0 {
-		if repos, err = pickRepos(ctx, srv); err != nil {
-			return err
-		}
-	}
-	if len(repos) == 0 {
-		lipgloss.Println("  " + ui.Muted.Render("Skipped. Add repos any time: outpost setup "+o.Host+" owner/repo"))
-	} else if err := runTasks(ctx, srv, DevUser, remote.Script{Body: reposScript, Runner: "bash", Args: repos}); err != nil {
-		return fmt.Errorf("repo setup failed (see above): %w", err)
-	}
-
-	if inUse {
-		ui.Header(6, totalSteps, "Health check")
-	} else {
-		ui.Header(6, totalSteps, "Reboot check")
-	}
-	if err := checkServices(ctx, srv, !inUse); err != nil {
+	if err := finalCheck(ctx, srv, st, inUse); err != nil {
 		return err
 	}
 
 	lipgloss.Println("\n" + doneBox.Render(
 		ui.Accent.Render("✓ All set.")+" "+ui.Bold.Render(o.Host)+" is ready for your agents.\n\n"+
-			"Open T3 Code, pick this server under Settings → Environments,\n"+
-			"choose a project, and start prompting."))
+			"In T3 Code, pick this server under Settings → Environments,\n"+
+			"add a project with ⌘K → Add Project, and start prompting."))
 	return nil
+}
+
+// steps numbers the headings of a run.
+type steps struct{ n, total int }
+
+func (s *steps) next(msg string) {
+	s.n++
+	ui.Header(s.n, s.total, msg)
+}
+
+// connect logs in to the server, reporting whether it already runs T3 (and so
+// may have agents working).
+func connect(ctx context.Context, srv remote.Server) (admin string, inUse bool, err error) {
+	if admin, err = adminUser(ctx, srv); err != nil {
+		return "", false, err
+	}
+	lipgloss.Println("  " + ui.Muted.Render("Logged in as "+admin))
+	inUse = admin == DevUser && srvOK(ctx, srv, "t3 status --json | jq -e .service.installed")
+	return admin, inUse, nil
+}
+
+func install(ctx context.Context, srv remote.Server, admin string) error {
+	if err := runTasks(ctx, srv, admin, remote.Script{Body: bootstrapScript, Runner: "sudo bash"}); err != nil {
+		return fmt.Errorf("the install failed (see above). Run the same command again to retry: %w", err)
+	}
+	return nil
+}
+
+// finalCheck reboots a new server to prove everything starts by itself. A
+// server already in use only gets a health check, so working agents aren't cut off.
+func finalCheck(ctx context.Context, srv remote.Server, st *steps, inUse bool) error {
+	if inUse {
+		st.next("Health check")
+	} else {
+		st.next("Reboot check")
+	}
+	return checkServices(ctx, srv, !inUse)
 }
 
 var doneBox = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#4ADE80")).Padding(0, 2)
@@ -187,19 +183,37 @@ func checkServices(ctx context.Context, srv remote.Server, reboot bool) (err err
 	}
 
 	p.Task("T3 Code, Docker and Tailscale running")
-	// Prints "<service> <state>" per line; is-active exits non-zero for stopped units, so ignore the exit code.
+	// Services can still be starting just after a boot, so give them a minute and a half.
+	deadline := time.Now().Add(90 * time.Second)
+	for {
+		down := servicesDown(ctx, srv)
+		if len(down) == 0 {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("not everything is running (%s). Run the same command again to repair it", strings.Join(down, ", "))
+		}
+		if err := sleep(ctx, 3*time.Second); err != nil {
+			return err
+		}
+	}
+}
+
+// servicesDown lists the services that aren't running, as "<name> is <state>".
+func servicesDown(ctx context.Context, srv remote.Server) []string {
+	// Prints "<name> <state>" per line; is-active exits non-zero for stopped units, so ignore the exit code.
 	out, _ := srv.Output(ctx, DevUser, `for u in docker tailscaled; do echo "$u $(systemctl is-active $u)"; done; `+
 		`echo "T3 $(systemctl --user is-active t3code.service)"`)
+	if len(out) == 0 {
+		return []string{"the server didn't answer"}
+	}
 	var down []string
 	for line := range strings.Lines(string(out)) {
 		if name, state, _ := strings.Cut(strings.TrimSpace(line), " "); state != "active" {
 			down = append(down, name+" is "+state)
 		}
 	}
-	if len(down) > 0 || len(out) == 0 {
-		return fmt.Errorf("not everything is running (%s). Run the same command again to repair it", strings.Join(down, ", "))
-	}
-	return nil
+	return down
 }
 
 func rebootAndWait(ctx context.Context, srv remote.Server, p *ui.Progress) error {

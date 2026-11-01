@@ -1,7 +1,7 @@
 # A stand-in for a freshly installed Ubuntu 24.04 VPS: systemd as PID 1, sshd, root key login.
 FROM ubuntu:24.04
 RUN apt-get update \
- && apt-get install -y --no-install-recommends systemd systemd-sysv dbus openssh-server sudo curl ca-certificates \
+ && apt-get install -y --no-install-recommends systemd systemd-sysv dbus openssh-server sudo curl ca-certificates sqlite3 \
  && rm -rf /var/lib/apt/lists/* \
  && systemctl enable ssh
 ARG PUBKEY
