@@ -108,8 +108,9 @@ check "status shows it healthy" 'grep -q "T3 Code, Docker and Tailscale running"
 echo "--- outpost backup"
 BACKUP="$(mktemp -d)/new.tar.gz"
 "$BIN" backup localhost:$NEW "$BACKUP" --yes </dev/null > /tmp/outpost-e2e-backup.log 2>&1 || { cat /tmp/outpost-e2e-backup.log; exit 1; }
-check "backup has uncommitted work" 'tar -xzOf "$BACKUP" code/Hello-World/notes.txt | grep -q wip'
-check "backup has T3 threads" 'tar -tzf "$BACKUP" | grep -q "^.t3/userdata/statev2.sqlite"'
+# grep without -q reads all of tar's output; -q stops early, and tar fails writing the rest.
+check "backup has uncommitted work" 'tar -xzOf "$BACKUP" code/Hello-World/notes.txt | grep wip >/dev/null'
+check "backup has T3 threads" 'tar -tzf "$BACKUP" | grep "^\.t3/userdata/statev2\.sqlite$" >/dev/null'
 check "T3 running again after backup" '[ "$(on_new "systemctl --user is-active t3code.service")" = active ]'
 
 echo "--- re-running the move is safe"
