@@ -35,6 +35,8 @@ type Host interface {
 	// CopyTo pipes srcCmd's output on this host into dstCmd on dst, both as user,
 	// calling progress with the running byte count.
 	CopyTo(ctx context.Context, dst Host, user, srcCmd, dstCmd string, progress func(int64)) error
+	// Download writes cmd's output to w, calling progress with the running byte count.
+	Download(ctx context.Context, user, cmd string, w io.Writer, progress func(int64)) error
 }
 
 // Script is a shell script to upload and run.
@@ -199,6 +201,30 @@ func (s Server) CopyTo(ctx context.Context, dst Host, user, srcCmd, dstCmd strin
 		return fmt.Errorf("write to %s: %w", to, withStderr(writeErr, &dstErr))
 	case readErr != nil:
 		return fmt.Errorf("read from %s: %w", s, withStderr(readErr, &srcErr))
+	}
+	return copyErr
+}
+
+func (s Server) Download(ctx context.Context, user, cmd string, w io.Writer, progress func(int64)) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var stderr bytes.Buffer
+	c := s.command(ctx, user, nil, cmd)
+	c.Stderr = &stderr
+	out, err := c.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	if err := c.Start(); err != nil {
+		return err
+	}
+	_, copyErr := io.Copy(w, &countingReader{r: out, progress: progress})
+	if copyErr != nil {
+		cancel() // we can't write any more (a full disk, say); stop the server's side rather than let it block
+	}
+	if err := c.Wait(); err != nil && copyErr == nil {
+		return fmt.Errorf("read from %s: %w", s, withStderr(err, &stderr))
 	}
 	return copyErr
 }

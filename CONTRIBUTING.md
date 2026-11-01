@@ -3,27 +3,36 @@
 ## Layout
 
 ```
-cmd/outpost/          CLI entry point (cobra + fang): setup, move, pair
-internal/setup/       The setup and move flows, written as step lists
+cmd/outpost/          CLI entry point (cobra + fang): every command and its flags
+internal/setup/       The flows behind each command
   setup.go            Setup, and the steps it shares with move: connect, install, final check
   move.go             Move: survey, confirm, transfer, retire
+  backup.go           Backup: survey, pause T3, download to a local file
+  swap.go             Swap: the question, what fits, and making or resizing /swapfile
   manifest.go         What a move carries, and every shell command built from that
-  dev.go              The dev user on a server: PATH, quoting, T3 service operations
-  logins.go           Sign-ins and how devices reach T3 (T3 Connect or Tailscale), and pair
+  dev.go              The managed server: the dev user on a server outpost set up. Every
+                      T3 and systemd command, by name; open and openActive (refuses retired)
+  access.go           How devices reach T3: parse, detect, switch, and pair
+  logins.go           Sign-ins: the accounts, and login
+  status.go           Status: inspect builds a report, then it's printed
+  update.go           Update: T3 Code, Claude Code and system packages
   scripts/
     bootstrap.sh      Runs as root: packages, user, SSH, firewall, Docker, Tailscale, T3, Claude
 internal/remote/      Host, the seam the flows depend on, and Server, its ssh adapter
 internal/servers/     Remembered servers and the picker
-internal/ui/          Banner, step headers and live progress
+internal/ui/          Banner, step headers, live progress, and Ask: every question to the user
 test/e2e/             End-to-end test with systemd containers posing as servers
 docs/                 User guide, how it works, logo and demo
 ```
 
 ## Design notes
 
-- **One seam.** The flows depend only on `remote.Host`. `remote.Server` is the ssh adapter; tests use a recording fake. New behavior in a flow should come with a fake-host test.
-- **Shell lives in two places.** `bootstrap.sh` for installing, and the `dev` and manifest modules for everything else. Callers express intent (`stopT3`, `retireT3`), not shell.
-- **Anything that reaches a remote shell is validated or ours:** server addresses go through `Server.Validate`, moved paths come from the manifest, and values are quoted with `quote`.
+- **Two seams.** The flows depend on `remote.Host` for the server and `ui.Ask` for the user. `remote.Server` and `ui.Terminal` are the real adapters; tests use a recording fake host and scripted answers. New behavior in a flow should come with a test through both.
+- **A server outpost set up goes through `dev`.** Commands get one from `open` (reading) or `openActive` (changing, refuses a retired server), so the retired guard can't be forgotten. Its commands are named constants (`cmdT3Running`, `cmdServices`, ...), and the fake host answers only those exact commands, so tests never repeat shell.
+- **Questions go through `ui.Ask`.** It checks for a terminal and handles Ctrl-C once; callers decide what no terminal means (a default, or an error naming the flag that answers instead).
+- **Shell lives in few places.** `bootstrap.sh` for installing; `dev.go` for T3 and systemd; and beside the one module that needs it (`manifest.go`, `setSwapCmd`, `updates`). Callers express intent (`stopT3`, `retireT3`), not shell.
+- **Every choice setup makes has a command to change it later** (`swap`, `access`, `login`), and `status` shows it. A new question in setup should come with both. Commands that would start T3 refuse a retired server.
+- **Anything that reaches a remote shell is validated or ours:** server addresses are validated once, where they're read (`servers.Parse`), moved paths come from the manifest, sizes are whole numbers, and values are quoted with `quote`.
 - **Re-runs must be safe.** Every step checks before it acts, and a server already in use is never rebooted.
 
 ## Tests
@@ -34,7 +43,7 @@ shellcheck internal/setup/scripts/*.sh test/e2e/run.sh
 test/e2e/run.sh                                        # about 10 minutes; needs Docker, Go and ~/.ssh/id_ed25519
 ```
 
-- **Unit tests** run the flows against the fake host: fresh and re-run setups, Tailscale and T3 Connect access, retired servers, failed copies and their undo. The manifest's commands run against temporary folders with real `tar` (on Linux; skipped on macOS, whose `tar` differs).
+- **Unit tests** run the flows against the fake host and scripted answers: fresh and re-run setups, swap and access changes, answered and cancelled questions, logins, updates, backups, status reports, retired servers, failed copies and their undo. The manifest's and swap file's commands run against temporary folders with real `tar` and `sed` (on Linux; skipped on macOS, whose tools differ).
 - **The end-to-end test** sets up an "old" server, gives it work (a T3 project, uncommitted changes, an unpushed branch, Claude settings and history), runs `outpost setup` and `outpost move` through the real binary, and checks that everything arrived, credentials didn't, T3 runs after a reboot, the old server is retired, and re-runs are safe. Logins need a human, so small stand-ins answer for them.
 
 CI runs gofmt, vet, the unit tests, shellcheck and the end-to-end test on every push.

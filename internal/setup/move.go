@@ -4,11 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 
-	"charm.land/huh/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/x/term"
 	"github.com/dustin/go-humanize"
 
 	"github.com/Beechey/outpost/internal/remote"
@@ -18,21 +15,17 @@ import (
 // Move sets up a new server and moves everything from an old one onto it: code,
 // T3 threads and projects, and agent history and settings (see manifest.go).
 // The new server takes over as the same T3 environment. Safe to re-run if it
-// stops partway. yes skips the confirmation; access is how devices reach the new server.
-func Move(ctx context.Context, old, dst remote.Server, yes bool, access Access) error {
-	for _, s := range []remote.Server{old, dst} {
-		if err := s.Validate(); err != nil {
-			return err
-		}
-	}
+// stops partway. yes skips the questions; access is how devices reach the new
+// server, and swap the swap it gets, as the user typed it ("" asks, unless yes).
+func Move(ctx context.Context, old, dst remote.Host, yes bool, access Access, swap string) error {
 	if old.String() == dst.String() {
 		return errors.New("the old and new server are the same")
 	}
-	return move(ctx, old, dst, yes, access)
-}
-
-func move(ctx context.Context, old, dst remote.Host, yes bool, access Access) error {
-	from, to := dev{old}, dev{dst}
+	if yes && swap == "" {
+		swap = "0"
+	}
+	var from dev
+	to := dev{h: dst}
 	var (
 		sv           survey
 		alreadyMoved bool
@@ -42,9 +35,9 @@ func move(ctx context.Context, old, dst remote.Host, yes bool, access Access) er
 	lipgloss.Println("\n" + ui.Banner)
 	err := runPlan(ctx, []step{
 		{"SSH key", ensureKey},
-		{"Checking " + old.String(), func(ctx context.Context) error {
-			if !old.CanLogin(ctx, DevUser) {
-				return fmt.Errorf("can't log in to %s as %s. Is it a server set up with outpost?", old, DevUser)
+		{"Checking " + old.String(), func(ctx context.Context) (err error) {
+			if from, err = open(ctx, old); err != nil {
+				return err
 			}
 			out, err := from.output(ctx, surveyCmd())
 			if err != nil {
@@ -65,19 +58,19 @@ func move(ctx context.Context, old, dst remote.Host, yes bool, access Access) er
 			if admin, inUse, err = connect(ctx, dst); err != nil {
 				return err
 			}
-			access = resolveAccess(ctx, to, admin, access)
+			access = resolveAccess(ctx, to, admin == DevUser, access)
 			if alreadyMoved || yes {
 				return nil
 			}
 			return confirmMove(ctx, old, dst)
 		}},
-		{"Installing on " + dst.String() + " (3-5 minutes)", func(ctx context.Context) error { return install(ctx, dst, admin) }},
+		{"Installing on " + dst.String() + " (3-5 minutes)", func(ctx context.Context) error { return install(ctx, dst, admin, swap) }},
 		{"Moving your work", func(ctx context.Context) error {
 			if alreadyMoved {
 				ui.Check("Already moved", "finishing the remaining steps")
 				return nil
 			}
-			return transfer(ctx, old, dst, sv)
+			return transfer(ctx, from, to, sv)
 		}},
 		{"Logins on " + dst.String(), func(ctx context.Context) error { return runLogins(ctx, to, access) }},
 		// A first move reboots to prove the new server starts by itself; a re-run may find agents at work there.
@@ -118,32 +111,17 @@ func plural(n, noun string) string {
 }
 
 func confirmMove(ctx context.Context, old, dst remote.Host) error {
-	if !term.IsTerminal(os.Stdin.Fd()) {
-		return errors.New("run in a terminal to confirm, or pass --yes")
-	}
-	ok := false
-	err := huh.NewForm(huh.NewGroup(huh.NewConfirm().
-		Title(fmt.Sprintf("Move everything from %s to %s?", old, dst)).
-		Description(fmt.Sprintf("T3 on %s stops now (agents mid-turn there will stop) and continues on %s.\n"+
-			"%s's files stay untouched until you delete it. T3 data already on %s is replaced.", old, dst, old, dst)).
-		Affirmative("Move").
-		Negative("Cancel").
-		Value(&ok),
-	)).RunWithContext(ctx)
-	if err != nil && !errors.Is(err, huh.ErrUserAborted) {
-		return err
-	}
-	if !ok {
-		return errors.New("cancelled. Nothing was changed")
-	}
-	return nil
+	return confirm(ctx, fmt.Sprintf("Move everything from %s to %s?", old, dst),
+		fmt.Sprintf("T3 on %s stops now (agents mid-turn there will stop) and continues on %s.\n"+
+			"%s's files stay untouched until you delete it. T3 data already on %s is replaced.", old, dst, old, dst),
+		"Move")
 }
 
 // transfer stops T3 on the old host, copies everything to dst, and retires
 // the old host's T3 so only one machine answers as this environment. If the
 // copy fails, T3 starts again on the old host.
-func transfer(ctx context.Context, old, dst remote.Host, sv survey) (err error) {
-	from, to := dev{old}, dev{dst}
+func transfer(ctx context.Context, from, to dev, sv survey) (err error) {
+	old, dst := from.h, to.h
 	p := ui.NewProgress()
 	defer func() { p.Done(err) }()
 
@@ -154,7 +132,7 @@ func transfer(ctx context.Context, old, dst remote.Host, sv survey) (err error) 
 	// undo restarts T3 on the old host after a failure, even if the run was cancelled with Ctrl-C.
 	undo := func(cause error) error {
 		if err := from.startT3(context.WithoutCancel(ctx)); err != nil {
-			return fmt.Errorf("%w. T3 on %s is still stopped; start it as %s there with: %s", cause, old, DevUser, service("start"))
+			return fmt.Errorf("%w. T3 on %s is still stopped; start it as %s there with: %s", cause, old, DevUser, cmdT3Start)
 		}
 		return fmt.Errorf("%w. T3 is running on %s again, so nothing is lost", cause, old)
 	}

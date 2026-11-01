@@ -2,17 +2,18 @@ package setup
 
 import (
 	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
-
-const installedCheck = ".service.installed"
 
 func TestSetupFreshServer(t *testing.T) {
 	ctx := testEnv(t)
 	srv := newFake("fresh", "root").healthy()
 
-	if err := setup(ctx, srv, AccessKeep); err != nil {
+	if err := Setup(ctx, srv, AccessUnset, ""); err != nil {
 		t.Fatal(err)
 	}
 	if !srv.ran("root: install script") {
@@ -27,7 +28,7 @@ func TestSetupCopiesKeyWhenNeeded(t *testing.T) {
 	ctx := testEnv(t)
 	srv := newFake("fresh").healthy() // nobody can log in yet
 
-	if err := setup(ctx, srv, AccessKeep); err != nil {
+	if err := Setup(ctx, srv, AccessUnset, ""); err != nil {
 		t.Fatal(err)
 	}
 	if !srv.ran("ssh-copy-id root") {
@@ -37,9 +38,9 @@ func TestSetupCopiesKeyWhenNeeded(t *testing.T) {
 
 func TestSetupServerInUseSkipsReboot(t *testing.T) {
 	ctx := testEnv(t)
-	srv := newFake("busy", DevUser).healthy().on(installedCheck, "true", nil)
+	srv := newFake("busy", DevUser).healthy().on(cmdT3Installed, "true", nil)
 
-	if err := setup(ctx, srv, AccessKeep); err != nil {
+	if err := Setup(ctx, srv, AccessUnset, ""); err != nil {
 		t.Fatal(err)
 	}
 	if srv.ran("systemctl reboot") {
@@ -52,9 +53,9 @@ func TestSetupServerInUseSkipsReboot(t *testing.T) {
 
 func TestSetupRefusesRetiredServer(t *testing.T) {
 	ctx := testEnv(t)
-	srv := newFake("old", DevUser).healthy().on("cat "+movedToFile, "new:22\n", nil)
+	srv := newFake("old", DevUser).healthy().on(cmdMovedTo, "new:22\n", nil)
 
-	err := setup(ctx, srv, AccessKeep)
+	err := Setup(ctx, srv, AccessUnset, "")
 	if err == nil || !strings.Contains(err.Error(), "retired") {
 		t.Fatalf("want a retired-server error, got %v", err)
 	}
@@ -68,10 +69,10 @@ func TestSetupReportsServicesThatDontStart(t *testing.T) {
 	saved := servicesTimeout
 	servicesTimeout = 0
 	t.Cleanup(func() { servicesTimeout = saved })
-	srv := newFake("broken", DevUser).on(installedCheck, "true", nil).
-		on("is-active", "docker active\ntailscaled active\nT3 failed\n", nil)
+	srv := newFake("broken", DevUser).on(cmdT3Installed, "true", nil).
+		on(cmdServices, "docker active\ntailscaled active\nT3 failed\n", nil)
 
-	err := setup(ctx, srv, AccessKeep)
+	err := Setup(ctx, srv, AccessUnset, "")
 	if err == nil || !strings.Contains(err.Error(), "T3 is failed") {
 		t.Fatalf("want T3 named as not running, got %v", err)
 	}
@@ -79,14 +80,14 @@ func TestSetupReportsServicesThatDontStart(t *testing.T) {
 
 // movable is an old server with work to move.
 func movable(name string) *fakeHost {
-	return newFake(name, DevUser).on("for p in", "path code\npath .t3/userdata\nt3 yes\nprojects 2\nsessions 5\nsize 1.2G\n", nil)
+	return newFake(name, DevUser).on(surveyCmd(), "path code\npath .t3/userdata\nt3 yes\nprojects 2\nsessions 5\nsize 1.2G\n", nil)
 }
 
 func TestMoveCopiesAndRetiresOld(t *testing.T) {
 	ctx := testEnv(t)
 	old, dst := movable("old"), newFake("new", "root").healthy()
 
-	if err := move(ctx, old, dst, true, AccessKeep); err != nil {
+	if err := Move(ctx, old, dst, true, AccessUnset, ""); err != nil {
 		t.Fatal(err)
 	}
 	if !old.ran("copy to new") {
@@ -108,11 +109,11 @@ func TestMoveCopyFailureRestartsOld(t *testing.T) {
 	old, dst := movable("old"), newFake("new", "root").healthy()
 	old.copyErr = errors.New("disk full")
 
-	err := move(ctx, old, dst, true, AccessKeep)
+	err := Move(ctx, old, dst, true, AccessUnset, "")
 	if err == nil || !strings.Contains(err.Error(), "running on old again") {
 		t.Fatalf("want a restarted-old error, got %v", err)
 	}
-	if !old.ran(service("start")) {
+	if !old.ran(cmdT3Start) {
 		t.Error("T3 should be started again on the old server")
 	}
 	if old.ran("t3 service uninstall") {
@@ -124,9 +125,9 @@ func TestMoveCopyFailureSaysWhenRestartFails(t *testing.T) {
 	ctx := testEnv(t)
 	old, dst := movable("old"), newFake("new", "root").healthy()
 	old.copyErr = errors.New("disk full")
-	old.on(service("start"), "", errors.New("unit failed"))
+	old.on(cmdT3Start, "", errors.New("unit failed"))
 
-	err := move(ctx, old, dst, true, AccessKeep)
+	err := Move(ctx, old, dst, true, AccessUnset, "")
 	if err == nil || !strings.Contains(err.Error(), "still stopped") {
 		t.Fatalf("want a still-stopped error, got %v", err)
 	}
@@ -134,10 +135,10 @@ func TestMoveCopyFailureSaysWhenRestartFails(t *testing.T) {
 
 func TestMoveRerunDoesntCopyOrReboot(t *testing.T) {
 	ctx := testEnv(t)
-	old := movable("old").on("for p in", "t3 yes\nmoved new\n", nil)
-	dst := newFake("new", DevUser).healthy().on(installedCheck, "true", nil)
+	old := movable("old").on(surveyCmd(), "t3 yes\nmoved new\n", nil)
+	dst := newFake("new", DevUser).healthy().on(cmdT3Installed, "true", nil)
 
-	if err := move(ctx, old, dst, true, AccessKeep); err != nil {
+	if err := Move(ctx, old, dst, true, AccessUnset, ""); err != nil {
 		t.Fatal(err)
 	}
 	if old.ran("copy to") {
@@ -150,10 +151,10 @@ func TestMoveRerunDoesntCopyOrReboot(t *testing.T) {
 
 func TestMoveRefusesServerMovedElsewhere(t *testing.T) {
 	ctx := testEnv(t)
-	old := movable("old").on("for p in", "t3 yes\nmoved other\n", nil)
+	old := movable("old").on(surveyCmd(), "t3 yes\nmoved other\n", nil)
 	dst := newFake("new", "root").healthy()
 
-	err := move(ctx, old, dst, true, AccessKeep)
+	err := Move(ctx, old, dst, true, AccessUnset, "")
 	if err == nil || !strings.Contains(err.Error(), "already moved to other") {
 		t.Fatalf("want an already-moved error, got %v", err)
 	}
@@ -166,23 +167,20 @@ func TestMoveNeedsConfirmationWithoutTerminal(t *testing.T) {
 	ctx := testEnv(t)
 	old, dst := movable("old"), newFake("new", "root").healthy()
 
-	err := move(ctx, old, dst, false, AccessKeep) // tests have no terminal
+	err := Move(ctx, old, dst, false, AccessUnset, "") // tests have no terminal
 	if err == nil || !strings.Contains(err.Error(), "--yes") {
 		t.Fatalf("want a confirm error, got %v", err)
 	}
-	if old.ran(service("stop")) {
+	if old.ran(cmdT3Stop) {
 		t.Error("T3 on the old server must not stop before the move is confirmed")
 	}
 }
 
-// tailscaleCheck matches the check for T3 serving on the tailnet only.
-const tailscaleCheck = "(.connect.enabled | not)"
-
 func TestSetupTailscaleMode(t *testing.T) {
 	ctx := testEnv(t)
-	srv := newFake("fresh", "root").healthy().on(tailscaleCheck, "", errors.New("not yet"))
+	srv := newFake("fresh", "root").healthy().on(t3Logins[AccessTailscale].Check, "", errors.New("not yet"))
 
-	if err := setup(ctx, srv, AccessTailscale); err != nil {
+	if err := Setup(ctx, srv, AccessTailscale, ""); err != nil {
 		t.Fatal(err)
 	}
 	if !srv.ran("t3 up --lan --no-connect") || !srv.ran("t3 pair --tailscale") {
@@ -197,7 +195,7 @@ func TestSetupKeepsTailscaleOnRerun(t *testing.T) {
 	ctx := testEnv(t)
 	srv := newFake("busy", DevUser).healthy() // every check passes: already on the tailnet only
 
-	if err := setup(ctx, srv, AccessKeep); err != nil {
+	if err := Setup(ctx, srv, AccessUnset, ""); err != nil {
 		t.Fatal(err)
 	}
 	if srv.ran("t3 up") {
@@ -207,9 +205,9 @@ func TestSetupKeepsTailscaleOnRerun(t *testing.T) {
 
 func TestSetupSwitchesToConnect(t *testing.T) {
 	ctx := testEnv(t)
-	srv := newFake("busy", DevUser).healthy().on(".connect.enabled and .service.installed", "", errors.New("off"))
+	srv := newFake("busy", DevUser).healthy().on(t3Logins[AccessConnect].Check, "", errors.New("off"))
 
-	if err := setup(ctx, srv, AccessConnect); err != nil {
+	if err := Setup(ctx, srv, AccessConnect, ""); err != nil {
 		t.Fatal(err)
 	}
 	if !srv.ran("t3 up --connect --no-lan") {
@@ -219,9 +217,9 @@ func TestSetupSwitchesToConnect(t *testing.T) {
 
 func TestPairRefusesConnectServer(t *testing.T) {
 	ctx := testEnv(t)
-	srv := newFake("box", DevUser).on(tailscaleCheck, "", errors.New("connect"))
+	srv := newFake("box", DevUser).on(t3Logins[AccessTailscale].Check, "", errors.New("connect"))
 
-	err := pair(ctx, srv)
+	err := Pair(ctx, srv)
 	if err == nil || !strings.Contains(err.Error(), "T3 Connect") {
 		t.Fatalf("want a uses-T3-Connect error, got %v", err)
 	}
@@ -234,10 +232,218 @@ func TestPairTailscaleServer(t *testing.T) {
 	ctx := testEnv(t)
 	srv := newFake("box", DevUser)
 
-	if err := pair(ctx, srv); err != nil {
+	if err := Pair(ctx, srv); err != nil {
 		t.Fatal(err)
 	}
 	if !srv.ran("t3 pair --tailscale") {
 		t.Error("should print a pairing link")
+	}
+}
+
+// addsSwap reports whether a swap file of gb was made.
+func addsSwap(f *fakeHost, gb int) bool { return f.ran(fmt.Sprintf("fallocate -l %dG", gb)) }
+
+// madeSwap reports whether any swap file was made.
+func madeSwap(f *fakeHost) bool { return f.ran("fallocate") }
+
+// roomy answers the memory check: 4 GB of memory, no swap, 50 GB of free disk.
+func roomy(f *fakeHost) *fakeHost {
+	return f.on(memoryCmd, "ram 4\nswapkb 0\nfile 0\ndisk 50\n", nil)
+}
+
+func TestSetupAddsSwapWhenChosen(t *testing.T) {
+	ctx := testEnv(t)
+	srv := roomy(newFake("fresh", "root").healthy())
+
+	if err := Setup(ctx, srv, AccessUnset, "4"); err != nil {
+		t.Fatal(err)
+	}
+	if !addsSwap(srv, 4) {
+		t.Error("should add 4 GB of swap")
+	}
+}
+
+func TestSetupAddsNoSwapUnlessChosen(t *testing.T) {
+	for _, gb := range []string{"", "0"} { // unanswered (no terminal), or none
+		ctx := testEnv(t)
+		srv := roomy(newFake("fresh", "root").healthy())
+
+		if err := Setup(ctx, srv, AccessUnset, gb); err != nil {
+			t.Fatal(err)
+		}
+		if madeSwap(srv) {
+			t.Errorf("swap %q: no swap should be added without the user choosing it", gb)
+		}
+	}
+}
+
+func TestSetupKeepsExistingSwap(t *testing.T) {
+	ctx := testEnv(t)
+	srv := newFake("busy", DevUser).healthy().on(memoryCmd, "ram 4\nswapkb 2097148\nfile 2\ndisk 50\n", nil)
+
+	if err := Setup(ctx, srv, AccessUnset, "8"); err != nil {
+		t.Fatal(err)
+	}
+	if madeSwap(srv) {
+		t.Error("a server with swap keeps it as it is")
+	}
+}
+
+func TestSetupRefusesSwapThatDoesntFit(t *testing.T) {
+	ctx := testEnv(t)
+	srv := newFake("small", "root").healthy().on(memoryCmd, "ram 2\nswapkb 0\nfile 0\ndisk 14\n", nil)
+
+	err := Setup(ctx, srv, AccessUnset, "8")
+	if err == nil || !strings.Contains(err.Error(), "doesn't fit") {
+		t.Fatalf("want a doesn't-fit error, got %v", err)
+	}
+	if srv.ran("install script") {
+		t.Error("nothing should be installed")
+	}
+}
+
+func TestMoveWithYesAddsNoSwap(t *testing.T) {
+	ctx := testEnv(t)
+	old, dst := movable("old"), roomy(newFake("new", "root").healthy())
+
+	if err := Move(ctx, old, dst, true, AccessUnset, ""); err != nil {
+		t.Fatal(err)
+	}
+	if madeSwap(dst) {
+		t.Error("--yes asks nothing, so no swap unless --swap is given")
+	}
+}
+
+func TestBackupPausesT3AndSavesFile(t *testing.T) {
+	ctx := testEnv(t)
+	srv := movable("box")
+	file := filepath.Join(t.TempDir(), "box.tar.gz")
+
+	if err := Backup(ctx, srv, file, true); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := os.ReadFile(file); string(got) != "archive" {
+		t.Errorf("file holds %q, want the downloaded archive", got)
+	}
+	if !srv.ran(cmdT3Stop) || !srv.ran(cmdT3Start) {
+		t.Error("T3 should pause for the download, then start again")
+	}
+}
+
+func TestBackupFailureLeavesNoFileAndRestartsT3(t *testing.T) {
+	ctx := testEnv(t)
+	srv := movable("box")
+	srv.copyErr = errors.New("connection lost")
+	dir := t.TempDir()
+
+	if err := Backup(ctx, srv, filepath.Join(dir, "box.tar.gz"), true); err == nil {
+		t.Fatal("want the download error")
+	}
+	if left, _ := os.ReadDir(dir); len(left) > 0 {
+		t.Errorf("a failed backup left %s behind", left[0].Name())
+	}
+	if !srv.ran(cmdT3Start) {
+		t.Error("T3 should start again after a failed download")
+	}
+}
+
+func TestBackupRefusesExistingFile(t *testing.T) {
+	ctx := testEnv(t)
+	srv := movable("box")
+	file := filepath.Join(t.TempDir(), "box.tar.gz")
+	if err := os.WriteFile(file, []byte("older backup"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	err := Backup(ctx, srv, file, true)
+	if err == nil || !strings.Contains(err.Error(), "already exists") {
+		t.Fatalf("want an already-exists error, got %v", err)
+	}
+	if srv.ran(cmdT3Stop) {
+		t.Error("T3 must not pause when there's nowhere to save")
+	}
+}
+
+func TestBackupNeedsConfirmationWithoutTerminal(t *testing.T) {
+	ctx := testEnv(t)
+	srv := movable("box")
+
+	err := Backup(ctx, srv, filepath.Join(t.TempDir(), "box.tar.gz"), false)
+	if err == nil || !strings.Contains(err.Error(), "--yes") {
+		t.Fatalf("want a confirm error, got %v", err)
+	}
+	if srv.ran(cmdT3Stop) {
+		t.Error("T3 must not pause before the backup is confirmed")
+	}
+}
+
+func TestBackupDoesntRestartStoppedT3(t *testing.T) {
+	ctx := testEnv(t)
+	srv := movable("retired").on(cmdT3Running, "", errors.New("inactive"))
+
+	if err := Backup(ctx, srv, filepath.Join(t.TempDir(), "box.tar.gz"), false); err != nil {
+		t.Fatal(err) // nothing to pause, so nothing to confirm
+	}
+	if srv.ran(cmdT3Start) {
+		t.Error("T3 that wasn't running must not be started")
+	}
+}
+
+func TestSwapResizesLater(t *testing.T) {
+	ctx := testEnv(t)
+	srv := newFake("box", DevUser).on(memoryCmd, "ram 4\nswapkb 4194300\nfile 4\ndisk 20\n", nil)
+
+	if err := Swap(ctx, srv, "8"); err != nil {
+		t.Fatal(err)
+	}
+	if !srv.ran("dev: sudo bash -c") || !srv.ran("swapoff "+swapFile) || !addsSwap(srv, 8) {
+		t.Error("should turn the old swap off and make an 8 GB one, as dev with sudo")
+	}
+}
+
+func TestSwapCountsTheFileItReplaces(t *testing.T) {
+	ctx := testEnv(t)
+	// 12 GB free plus the 4 GB file being replaced leaves room for 6 GB, not 2.
+	srv := newFake("box", DevUser).on(memoryCmd, "ram 4\nswapkb 4194300\nfile 4\ndisk 12\n", nil)
+
+	if err := Swap(ctx, srv, "6"); err != nil {
+		t.Fatal(err)
+	}
+	if err := Swap(ctx, srv, "7"); err == nil || !strings.Contains(err.Error(), "doesn't fit") {
+		t.Fatalf("want a doesn't-fit error, got %v", err)
+	}
+}
+
+func TestSwapRemoves(t *testing.T) {
+	ctx := testEnv(t)
+	srv := newFake("box", DevUser).on(memoryCmd, "ram 4\nswapkb 4194300\nfile 4\ndisk 20\n", nil)
+
+	if err := Swap(ctx, srv, "0"); err != nil {
+		t.Fatal(err)
+	}
+	if !srv.ran("swapoff "+swapFile) || madeSwap(srv) {
+		t.Error("0 should remove the swap file and make no new one")
+	}
+}
+
+func TestSwapLeavesSameSizeAlone(t *testing.T) {
+	ctx := testEnv(t)
+	srv := newFake("box", DevUser).on(memoryCmd, "ram 4\nswapkb 4194300\nfile 4\ndisk 20\n", nil)
+
+	if err := Swap(ctx, srv, "4"); err != nil {
+		t.Fatal(err)
+	}
+	if srv.ran("sudo bash -c") {
+		t.Error("nothing should change when the size is the same")
+	}
+}
+
+func TestSwapNeedsSizeWithoutTerminal(t *testing.T) {
+	ctx := testEnv(t)
+	srv := roomy(newFake("box", DevUser))
+
+	err := Swap(ctx, srv, "")
+	if err == nil || !strings.Contains(err.Error(), "outpost swap box GB") {
+		t.Fatalf("want a give-the-size error, got %v", err)
 	}
 }

@@ -31,17 +31,10 @@ var (
 	pollInterval    = 3 * time.Second
 )
 
-// Setup prepares a server for T3 Code, reachable the given way. It is safe to
-// re-run on a finished server.
-func Setup(ctx context.Context, srv remote.Server, access Access) error {
-	if err := srv.Validate(); err != nil {
-		return err
-	}
-	return setup(ctx, srv, access)
-}
-
-func setup(ctx context.Context, h remote.Host, access Access) error {
-	d := dev{h}
+// Setup prepares a server for T3 Code, reachable the given way, with swap the
+// size the user typed ("" asks). It is safe to re-run on a finished server.
+func Setup(ctx context.Context, h remote.Host, access Access, swap string) error {
+	d := dev{h: h} // the dev user exists once the install has run
 	var admin string
 	var inUse bool
 	lipgloss.Println("\n" + ui.Banner)
@@ -52,17 +45,16 @@ func setup(ctx context.Context, h remote.Host, access Access) error {
 				return err
 			}
 			if admin != DevUser {
+				access = resolveAccess(ctx, d, false, access)
 				return nil // a fresh server: nothing has run there yet
 			}
-			if to := d.movedTo(ctx); to != "" {
-				// Setting it up again would bring back a second machine answering as the same T3 environment.
-				return fmt.Errorf("this server's work was moved to %s with outpost move, so it's retired. "+
-					"Set up %s instead, or to reuse this server, delete %s on it first", to, to, movedToFile)
+			if d, err = openActive(ctx, h); err != nil {
+				return err
 			}
-			access = resolveAccess(ctx, d, admin, access)
+			access = resolveAccess(ctx, d, true, access)
 			return nil
 		}},
-		{"Installing (3-5 minutes)", func(ctx context.Context) error { return install(ctx, h, admin) }},
+		{"Installing (3-5 minutes)", func(ctx context.Context) error { return install(ctx, h, admin, swap) }},
 		{"Logins", func(ctx context.Context) error { return runLogins(ctx, d, access) }},
 		// A server already running T3 may have agents at work, so it gets a health check, not a reboot.
 		{"Final check", func(ctx context.Context) error { return finalCheck(ctx, d, !inUse) }},
@@ -94,6 +86,20 @@ func runPlan(ctx context.Context, plan []step) error {
 	return nil
 }
 
+// confirm asks the user to go ahead, failing unless they choose yes.
+func confirm(ctx context.Context, title, description, yes string) error {
+	ok, err := ui.Ask.Confirm(ctx, title, description, yes)
+	switch {
+	case errors.Is(err, ui.ErrNoTerminal):
+		return errors.New("run in a terminal to confirm, or pass --yes")
+	case err != nil:
+		return err
+	case !ok:
+		return ui.ErrCancelled
+	}
+	return nil
+}
+
 // connect logs in to the host, reporting who runs the install and whether the
 // host already runs T3 (and so may have agents working).
 func connect(ctx context.Context, h remote.Host) (admin string, inUse bool, err error) {
@@ -101,7 +107,7 @@ func connect(ctx context.Context, h remote.Host) (admin string, inUse bool, err 
 		return "", false, err
 	}
 	lipgloss.Println("  " + ui.Muted.Render("Logged in as "+admin))
-	return admin, admin == DevUser && dev{h}.t3Installed(ctx), nil
+	return admin, admin == DevUser && dev{h: h}.t3Installed(ctx), nil
 }
 
 // adminUser picks who runs the install: root on a fresh server, or dev on a
@@ -125,7 +131,12 @@ func adminUser(ctx context.Context, h remote.Host) (string, error) {
 	return "root", nil
 }
 
-func install(ctx context.Context, h remote.Host, admin string) error {
+// install runs bootstrap.sh, first adding the swap the user chose, so a small
+// server has room for the install.
+func install(ctx context.Context, h remote.Host, admin, swap string) error {
+	if err := installSwap(ctx, h, admin, swap); err != nil {
+		return err
+	}
 	if err := runTasks(ctx, h, admin, remote.Script{Body: bootstrapScript, AsRoot: true}); err != nil {
 		return fmt.Errorf("the install failed (see above). Run the same command again to retry: %w", err)
 	}

@@ -10,16 +10,22 @@ fetch() { curl -fsSL --retry 5 --retry-delay 2 --retry-all-errors "$@"; }
 DEV_USER=dev # must match DevUser in internal/setup/dev.go
 [ "$(id -u)" -eq 0 ] || { echo "Run as root (sudo bash bootstrap.sh)"; exit 1; }
 export DEBIAN_FRONTEND=noninteractive
+# Wait for the daily security updates to finish rather than fail on apt's lock.
+apt_get() { apt-get -o DPkg::Lock::Timeout=600 "$@"; }
 
 task "System packages"
-apt-get update
-apt-get install -y git gh curl ca-certificates build-essential unzip jq ripgrep tmux ufw
+apt_get update
+apt_get install -y git gh curl ca-certificates build-essential unzip jq ripgrep tmux ufw unattended-upgrades
+
+task "Security updates"
+# Daily, security fixes only, and never an automatic reboot: that would stop agents mid-turn.
+printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\n' > /etc/apt/apt.conf.d/20auto-upgrades
 
 task "Node.js"
 # Node for your projects (T3 itself ships its own runtime)
 if ! command -v node >/dev/null; then
   fetch https://deb.nodesource.com/setup_24.x | bash -
-  apt-get install -y nodejs
+  apt_get install -y nodejs
 fi
 
 task "Docker"

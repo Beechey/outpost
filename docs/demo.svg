@@ -11,13 +11,17 @@ g.l { opacity: 0; animation-duration: 22s; animation-iteration-count: infinite; 
 @keyframes a9 { 0% { opacity: 0 } 9% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a9 { animation-name: a9; }
 @keyframes a11 { 0% { opacity: 0 } 11% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a11 { animation-name: a11; }
 @keyframes a13 { 0% { opacity: 0 } 13% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a13 { animation-name: a13; }
+@keyframes a14 { 0% { opacity: 0 } 14% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a14 { animation-name: a14; }
+@keyframes a15 { 0% { opacity: 0 } 15% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a15 { animation-name: a15; }
 @keyframes a16 { 0% { opacity: 0 } 16% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a16 { animation-name: a16; }
-@keyframes a19 { 0% { opacity: 0 } 19% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a19 { animation-name: a19; }
+@keyframes a18 { 0% { opacity: 0 } 18% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a18 { animation-name: a18; }
+@keyframes a20 { 0% { opacity: 0 } 20% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a20 { animation-name: a20; }
 @keyframes a22 { 0% { opacity: 0 } 22% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a22 { animation-name: a22; }
-@keyframes a25 { 0% { opacity: 0 } 25% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a25 { animation-name: a25; }
+@keyframes a24 { 0% { opacity: 0 } 24% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a24 { animation-name: a24; }
+@keyframes a26 { 0% { opacity: 0 } 26% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a26 { animation-name: a26; }
 @keyframes a28 { 0% { opacity: 0 } 28% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a28 { animation-name: a28; }
-@keyframes a31 { 0% { opacity: 0 } 31% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a31 { animation-name: a31; }
-@keyframes a34 { 0% { opacity: 0 } 34% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a34 { animation-name: a34; }
+@keyframes a30 { 0% { opacity: 0 } 30% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a30 { animation-name: a30; }
+@keyframes a32 { 0% { opacity: 0 } 32% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a32 { animation-name: a32; }
 @keyframes a38 { 0% { opacity: 0 } 38% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a38 { animation-name: a38; }
 @keyframes a40 { 0% { opacity: 0 } 40% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a40 { animation-name: a40; }
 @keyframes a44 { 0% { opacity: 0 } 44% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a44 { animation-name: a44; }
@@ -29,24 +33,23 @@ g.l { opacity: 0; animation-duration: 22s; animation-iteration-count: infinite; 
 @keyframes a65 { 0% { opacity: 0 } 65% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a65 { animation-name: a65; }
 @keyframes a68 { 0% { opacity: 0 } 68% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a68 { animation-name: a68; }
 @keyframes a71 { 0% { opacity: 0 } 71% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a71 { animation-name: a71; }
-@keyframes s0 { 0% { transform: translateY(0) } 65% { transform: translateY(-21px) } 68% { transform: translateY(-42px) } 71% { transform: translateY(-158px) } 100% { transform: translateY(-158px) } } .s0 { animation: s0 22s steps(1, end) infinite; }
+@keyframes s0 { 0% { transform: translateY(0) } 48% { transform: translateY(-21px) } 52% { transform: translateY(-42px) } 56% { transform: translateY(-63px) } 59% { transform: translateY(-84px) } 62% { transform: translateY(-105px) } 65% { transform: translateY(-126px) } 68% { transform: translateY(-147px) } 71% { transform: translateY(-263px) } 100% { transform: translateY(-263px) } } .s0 { animation: s0 22s steps(1, end) infinite; }
 @keyframes a4 { 0% { opacity: 0 } 4% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a4 { animation-name: a4; }
 @keyframes a7 { 0% { opacity: 0 } 7% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a7 { animation-name: a7; }
 @keyframes a8 { 0% { opacity: 0 } 8% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a8 { animation-name: a8; }
 @keyframes a10 { 0% { opacity: 0 } 10% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a10 { animation-name: a10; }
 @keyframes a12 { 0% { opacity: 0 } 12% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a12 { animation-name: a12; }
-@keyframes a14 { 0% { opacity: 0 } 14% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a14 { animation-name: a14; }
-@keyframes a15 { 0% { opacity: 0 } 15% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a15 { animation-name: a15; }
 @keyframes a17 { 0% { opacity: 0 } 17% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a17 { animation-name: a17; }
-@keyframes a18 { 0% { opacity: 0 } 18% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a18 { animation-name: a18; }
-@keyframes a20 { 0% { opacity: 0 } 20% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a20 { animation-name: a20; }
 @keyframes a21 { 0% { opacity: 0 } 21% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a21 { animation-name: a21; }
 @keyframes a23 { 0% { opacity: 0 } 23% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a23 { animation-name: a23; }
+@keyframes a25 { 0% { opacity: 0 } 25% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a25 { animation-name: a25; }
 @keyframes a27 { 0% { opacity: 0 } 27% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a27 { animation-name: a27; }
 @keyframes a29 { 0% { opacity: 0 } 29% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a29 { animation-name: a29; }
+@keyframes a31 { 0% { opacity: 0 } 31% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a31 { animation-name: a31; }
 @keyframes a33 { 0% { opacity: 0 } 33% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a33 { animation-name: a33; }
 @keyframes a35 { 0% { opacity: 0 } 35% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a35 { animation-name: a35; }
 @keyframes a37 { 0% { opacity: 0 } 37% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a37 { animation-name: a37; }
+@keyframes a39 { 0% { opacity: 0 } 39% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a39 { animation-name: a39; }
 @keyframes a42 { 0% { opacity: 0 } 42% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a42 { animation-name: a42; }
 @keyframes a50 { 0% { opacity: 0 } 50% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a50 { animation-name: a50; }
 @keyframes a54 { 0% { opacity: 0 } 54% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a54 { animation-name: a54; }
@@ -58,7 +61,7 @@ g.l { opacity: 0; animation-duration: 22s; animation-iteration-count: infinite; 
 @keyframes a73 { 0% { opacity: 0 } 73% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a73 { animation-name: a73; }
 @keyframes a75 { 0% { opacity: 0 } 75% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a75 { animation-name: a75; }
 @keyframes a78 { 0% { opacity: 0 } 78% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } } .a78 { animation-name: a78; }
-@keyframes s1 { 0% { transform: translateY(0) } 40% { transform: translateY(-21px) } 42% { transform: translateY(-42px) } 44% { transform: translateY(-63px) } 50% { transform: translateY(-84px) } 52% { transform: translateY(-105px) } 54% { transform: translateY(-126px) } 57% { transform: translateY(-147px) } 59% { transform: translateY(-168px) } 59% { transform: translateY(-189px) } 61% { transform: translateY(-210px) } 63% { transform: translateY(-231px) } 65% { transform: translateY(-252px) } 67% { transform: translateY(-273px) } 69% { transform: translateY(-294px) } 71% { transform: translateY(-315px) } 73% { transform: translateY(-336px) } 75% { transform: translateY(-357px) } 78% { transform: translateY(-473px) } 100% { transform: translateY(-473px) } } .s1 { animation: s1 22s steps(1, end) infinite; }
+@keyframes s1 { 0% { transform: translateY(0) } 33% { transform: translateY(-21px) } 35% { transform: translateY(-42px) } 37% { transform: translateY(-63px) } 39% { transform: translateY(-84px) } 40% { transform: translateY(-105px) } 42% { transform: translateY(-126px) } 44% { transform: translateY(-147px) } 50% { transform: translateY(-168px) } 52% { transform: translateY(-189px) } 54% { transform: translateY(-210px) } 57% { transform: translateY(-231px) } 59% { transform: translateY(-252px) } 59% { transform: translateY(-273px) } 61% { transform: translateY(-294px) } 63% { transform: translateY(-315px) } 65% { transform: translateY(-336px) } 67% { transform: translateY(-357px) } 69% { transform: translateY(-378px) } 71% { transform: translateY(-399px) } 73% { transform: translateY(-420px) } 75% { transform: translateY(-441px) } 78% { transform: translateY(-557px) } 100% { transform: translateY(-557px) } } .s1 { animation: s1 22s steps(1, end) infinite; }
 </style>
 <defs><clipPath id="c0"><rect x="0" y="41" width="540" height="502"/></clipPath><clipPath id="c1"><rect x="541" y="41" width="540" height="502"/></clipPath></defs>
 <rect width="1081" height="544" rx="14" fill="#0E1015"/>
@@ -75,25 +78,30 @@ g.l { opacity: 0; animation-duration: 22s; animation-iteration-count: infinite; 
 <g class="l a9"><text x="20" y="137"><tspan fill="#4ADE80">2/5</tspan><tspan fill="#ECEEF3" class="b">  Connecting to 203.0.113.7</tspan></text></g>
 <g class="l a11"><text x="20" y="158"><tspan fill="#8B90A0">    Logged in as root</tspan></text></g>
 <g class="l a13"><text x="20" y="179"><tspan fill="#4ADE80">3/5</tspan><tspan fill="#ECEEF3" class="b">  Installing (3-5 minutes)</tspan></text></g>
-<g class="l a16"><text x="20" y="200"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">System packages </tspan><tspan fill="#8B90A0">41s</tspan></text></g>
-<g class="l a19"><text x="20" y="221"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Node.js </tspan><tspan fill="#8B90A0">12s</tspan></text></g>
-<g class="l a22"><text x="20" y="242"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Docker </tspan><tspan fill="#8B90A0">38s</tspan></text></g>
-<g class="l a25"><text x="20" y="263"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Tailscale </tspan><tspan fill="#8B90A0">9s</tspan></text></g>
-<g class="l a28"><text x="20" y="284"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">User and SSH </tspan><tspan fill="#8B90A0">2s</tspan></text></g>
-<g class="l a31"><text x="20" y="305"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Firewall </tspan><tspan fill="#8B90A0">1s</tspan></text></g>
-<g class="l a34"><text x="20" y="326"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">T3 Code and Claude Code </tspan><tspan fill="#8B90A0">52s</tspan></text></g>
-<g class="l a38"><text x="20" y="347"><tspan fill="#4ADE80">4/5</tspan><tspan fill="#ECEEF3" class="b">  Logins</tspan></text></g>
-<g class="l a40"><text x="20" y="368"><tspan fill="#7AA2F7">    ◆ </tspan><tspan fill="#ECEEF3" class="b">Tailscale  </tspan><tspan fill="#8B90A0">Open the link and sign in with the same</tspan></text></g>
-<g class="l a40"><text x="20" y="389"><tspan fill="#8B90A0">      account as your laptop.</tspan></text></g>
-<g class="l a44"><text x="20" y="410"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Tailscale </tspan><tspan fill="#8B90A0">signed in</tspan></text></g>
-<g class="l a48"><text x="20" y="431"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Claude </tspan><tspan fill="#8B90A0">signed in</tspan></text></g>
-<g class="l a52"><text x="20" y="452"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">GitHub </tspan><tspan fill="#8B90A0">signed in</tspan></text></g>
-<g class="l a56"><text x="20" y="473"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">T3 Connect </tspan><tspan fill="#8B90A0">signed in</tspan></text></g>
-<g class="l a59"><text x="20" y="494"><tspan fill="#4ADE80">5/5</tspan><tspan fill="#ECEEF3" class="b">  Final check</tspan></text></g>
-<g class="l a62"><text x="20" y="515"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Rebooting </tspan><tspan fill="#8B90A0">15s</tspan></text></g>
-<g class="l a65"><text x="20" y="536"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Waiting for the server to come back </tspan><tspan fill="#8B90A0">31s</tspan></text></g>
-<g class="l a68"><text x="20" y="557"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">T3 Code, Docker and Tailscale running </tspan><tspan fill="#8B90A0">3s</tspan></text></g>
-<g class="l a71"><rect x="20" y="571" width="500" height="80" rx="8" fill="none" stroke="#4ADE80"/><text x="36" y="595"><tspan fill="#4ADE80" class="b">✓ All set.</tspan><tspan fill="#ECEEF3"> 203.0.113.7 is ready for your agents.</tspan></text><text x="36" y="616" fill="#8B90A0">In T3 Code, pick this server under Settings → Environments,</text><text x="36" y="637" fill="#8B90A0">add a project with ⌘K → Add Project, and start prompting.</text><rect class="cursor" x="20" y="659" width="8" height="15" fill="#ECEEF3"/></g>
+<g class="l a14"><text x="20" y="200"><tspan fill="#7AA2F7">    ┃ </tspan><tspan fill="#ECEEF3" class="b">How many GB of disk should the server use as swap?</tspan></text></g>
+<g class="l a14"><text x="20" y="221"><tspan fill="#7AA2F7">    ┃ </tspan><tspan fill="#8B90A0">This server has 4 GB of memory and 76 GB of free disk.</tspan></text></g>
+<g class="l a15"><text x="20" y="242"><tspan fill="#7AA2F7">    ┃ </tspan><tspan fill="#4ADE80">&gt; </tspan><tspan fill="#ECEEF3">4</tspan></text></g>
+<g class="l a16"><text x="20" y="263"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Swap (4 GB) </tspan><tspan fill="#8B90A0">3s</tspan></text></g>
+<g class="l a18"><text x="20" y="284"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">System packages </tspan><tspan fill="#8B90A0">41s</tspan></text></g>
+<g class="l a20"><text x="20" y="305"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Security updates </tspan><tspan fill="#8B90A0">4s</tspan></text></g>
+<g class="l a22"><text x="20" y="326"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Node.js </tspan><tspan fill="#8B90A0">12s</tspan></text></g>
+<g class="l a24"><text x="20" y="347"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Docker </tspan><tspan fill="#8B90A0">38s</tspan></text></g>
+<g class="l a26"><text x="20" y="368"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Tailscale </tspan><tspan fill="#8B90A0">9s</tspan></text></g>
+<g class="l a28"><text x="20" y="389"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">User and SSH </tspan><tspan fill="#8B90A0">2s</tspan></text></g>
+<g class="l a30"><text x="20" y="410"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Firewall </tspan><tspan fill="#8B90A0">1s</tspan></text></g>
+<g class="l a32"><text x="20" y="431"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">T3 Code and Claude Code </tspan><tspan fill="#8B90A0">52s</tspan></text></g>
+<g class="l a38"><text x="20" y="452"><tspan fill="#4ADE80">4/5</tspan><tspan fill="#ECEEF3" class="b">  Logins</tspan></text></g>
+<g class="l a40"><text x="20" y="473"><tspan fill="#7AA2F7">    ◆ </tspan><tspan fill="#ECEEF3" class="b">Tailscale  </tspan><tspan fill="#8B90A0">Open the link and sign in with the same</tspan></text></g>
+<g class="l a40"><text x="20" y="494"><tspan fill="#8B90A0">      account as your laptop.</tspan></text></g>
+<g class="l a44"><text x="20" y="515"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Tailscale </tspan><tspan fill="#8B90A0">signed in</tspan></text></g>
+<g class="l a48"><text x="20" y="536"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Claude </tspan><tspan fill="#8B90A0">signed in</tspan></text></g>
+<g class="l a52"><text x="20" y="557"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">GitHub </tspan><tspan fill="#8B90A0">signed in</tspan></text></g>
+<g class="l a56"><text x="20" y="578"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">T3 Connect </tspan><tspan fill="#8B90A0">signed in</tspan></text></g>
+<g class="l a59"><text x="20" y="599"><tspan fill="#4ADE80">5/5</tspan><tspan fill="#ECEEF3" class="b">  Final check</tspan></text></g>
+<g class="l a62"><text x="20" y="620"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Rebooting </tspan><tspan fill="#8B90A0">15s</tspan></text></g>
+<g class="l a65"><text x="20" y="641"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Waiting for the server to come back </tspan><tspan fill="#8B90A0">31s</tspan></text></g>
+<g class="l a68"><text x="20" y="662"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">T3 Code, Docker and Tailscale running </tspan><tspan fill="#8B90A0">3s</tspan></text></g>
+<g class="l a71"><rect x="20" y="676" width="500" height="80" rx="8" fill="none" stroke="#4ADE80"/><text x="36" y="700"><tspan fill="#4ADE80" class="b">✓ All set.</tspan><tspan fill="#ECEEF3"> 203.0.113.7 is ready for your agents.</tspan></text><text x="36" y="721" fill="#8B90A0">In T3 Code, pick this server under Settings → Environments,</text><text x="36" y="742" fill="#8B90A0">add a project with ⌘K → Add Project, and start prompting.</text><rect class="cursor" x="20" y="764" width="8" height="15" fill="#ECEEF3"/></g>
 </g></g>
 <g clip-path="url(#c1)"><g class="s1">
 <g class="l a4"><text x="561" y="74"><tspan fill="#8B90A0">$ </tspan><tspan fill="#ECEEF3" class="b">outpost move 192.0.2.10 198.51.100.4</tspan></text></g>
@@ -111,30 +119,34 @@ g.l { opacity: 0; animation-duration: 22s; animation-iteration-count: infinite; 
 <g class="l a20"><text x="561" y="326"><tspan fill="#7AA2F7">    ┃ </tspan><tspan fill="#ECEEF3" class="b">Move everything from 192.0.2.10 to 198.51.100.4?</tspan></text></g>
 <g class="l a21"><text x="561" y="347"><tspan fill="#7AA2F7">    ┃ </tspan><tspan fill="#4ADE80" class="b"> Move </tspan><tspan fill="#8B90A0">  Cancel</tspan></text></g>
 <g class="l a23"><text x="561" y="368"><tspan fill="#4ADE80">4/7</tspan><tspan fill="#ECEEF3" class="b">  Installing on 198.51.100.4 (3-5 minutes)</tspan></text></g>
-<g class="l a25"><text x="561" y="389"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">System packages </tspan><tspan fill="#8B90A0">43s</tspan></text></g>
-<g class="l a27"><text x="561" y="410"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Node.js </tspan><tspan fill="#8B90A0">11s</tspan></text></g>
-<g class="l a29"><text x="561" y="431"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Docker </tspan><tspan fill="#8B90A0">36s</tspan></text></g>
-<g class="l a31"><text x="561" y="452"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Tailscale </tspan><tspan fill="#8B90A0">9s</tspan></text></g>
-<g class="l a33"><text x="561" y="473"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">User and SSH </tspan><tspan fill="#8B90A0">2s</tspan></text></g>
-<g class="l a35"><text x="561" y="494"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Firewall </tspan><tspan fill="#8B90A0">1s</tspan></text></g>
-<g class="l a37"><text x="561" y="515"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">T3 Code and Claude Code </tspan><tspan fill="#8B90A0">50s</tspan></text></g>
-<g class="l a40"><text x="561" y="536"><tspan fill="#4ADE80">5/7</tspan><tspan fill="#ECEEF3" class="b">  Moving your work</tspan></text></g>
-<g class="l a42"><text x="561" y="557"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Stopping T3 on 192.0.2.10 </tspan><tspan fill="#8B90A0">2s</tspan></text></g>
-<g class="l a44"><text x="561" y="578"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Clearing T3 data on 198.51.100.4 </tspan><tspan fill="#8B90A0">1s</tspan></text></g>
-<g class="l a50"><text x="561" y="599"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Copying 3.1 GB </tspan><tspan fill="#8B90A0">3.1 GB sent </tspan><tspan fill="#8B90A0">1m 48s</tspan></text></g>
-<g class="l a52"><text x="561" y="620"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Retiring T3 on 192.0.2.10 </tspan><tspan fill="#8B90A0">1s</tspan></text></g>
-<g class="l a54"><text x="561" y="641"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Starting T3 on 198.51.100.4 </tspan><tspan fill="#8B90A0">2s</tspan></text></g>
-<g class="l a57"><text x="561" y="662"><tspan fill="#4ADE80">6/7</tspan><tspan fill="#ECEEF3" class="b">  Logins on 198.51.100.4</tspan></text></g>
-<g class="l a59"><text x="561" y="683"><tspan fill="#7AA2F7">    ◆ </tspan><tspan fill="#ECEEF3" class="b">Tailscale  </tspan><tspan fill="#8B90A0">Open the link and sign in with the same</tspan></text></g>
-<g class="l a59"><text x="561" y="704"><tspan fill="#8B90A0">      account as your laptop.</tspan></text></g>
-<g class="l a61"><text x="561" y="725"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Tailscale </tspan><tspan fill="#8B90A0">signed in</tspan></text></g>
-<g class="l a63"><text x="561" y="746"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Claude </tspan><tspan fill="#8B90A0">signed in</tspan></text></g>
-<g class="l a65"><text x="561" y="767"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">GitHub </tspan><tspan fill="#8B90A0">signed in</tspan></text></g>
-<g class="l a67"><text x="561" y="788"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">T3 Connect </tspan><tspan fill="#8B90A0">signed in</tspan></text></g>
-<g class="l a69"><text x="561" y="809"><tspan fill="#4ADE80">7/7</tspan><tspan fill="#ECEEF3" class="b">  Final check</tspan></text></g>
-<g class="l a71"><text x="561" y="830"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Rebooting </tspan><tspan fill="#8B90A0">15s</tspan></text></g>
-<g class="l a73"><text x="561" y="851"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Waiting for the server to come back </tspan><tspan fill="#8B90A0">29s</tspan></text></g>
-<g class="l a75"><text x="561" y="872"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">T3 Code, Docker and Tailscale running </tspan><tspan fill="#8B90A0">3s</tspan></text></g>
-<g class="l a78"><rect x="561" y="886" width="500" height="80" rx="8" fill="none" stroke="#4ADE80"/><text x="577" y="910"><tspan fill="#4ADE80" class="b">✓ Moved.</tspan><tspan fill="#ECEEF3"> Everything from 192.0.2.10 now lives on</tspan></text><text x="577" y="931" fill="#8B90A0">198.51.100.4. Your threads continue in T3 Code where</text><text x="577" y="952" fill="#8B90A0">they left off.</text><rect class="cursor" x="561" y="974" width="8" height="15" fill="#ECEEF3"/></g>
+<g class="l a24"><text x="561" y="389"><tspan fill="#7AA2F7">    ┃ </tspan><tspan fill="#ECEEF3" class="b">How many GB of disk should the server use as swap?</tspan></text></g>
+<g class="l a24"><text x="561" y="410"><tspan fill="#7AA2F7">    ┃ </tspan><tspan fill="#8B90A0">This server has 8 GB of memory and 152 GB of free disk.</tspan></text></g>
+<g class="l a24"><text x="561" y="431"><tspan fill="#7AA2F7">    ┃ </tspan><tspan fill="#4ADE80">&gt; </tspan><tspan fill="#ECEEF3">0</tspan></text></g>
+<g class="l a25"><text x="561" y="452"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">System packages </tspan><tspan fill="#8B90A0">43s</tspan></text></g>
+<g class="l a27"><text x="561" y="473"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Security updates </tspan><tspan fill="#8B90A0">4s</tspan></text></g>
+<g class="l a29"><text x="561" y="494"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Node.js </tspan><tspan fill="#8B90A0">11s</tspan></text></g>
+<g class="l a31"><text x="561" y="515"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Docker </tspan><tspan fill="#8B90A0">36s</tspan></text></g>
+<g class="l a33"><text x="561" y="536"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Tailscale </tspan><tspan fill="#8B90A0">9s</tspan></text></g>
+<g class="l a35"><text x="561" y="557"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">User and SSH </tspan><tspan fill="#8B90A0">2s</tspan></text></g>
+<g class="l a37"><text x="561" y="578"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Firewall </tspan><tspan fill="#8B90A0">1s</tspan></text></g>
+<g class="l a39"><text x="561" y="599"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">T3 Code and Claude Code </tspan><tspan fill="#8B90A0">50s</tspan></text></g>
+<g class="l a40"><text x="561" y="620"><tspan fill="#4ADE80">5/7</tspan><tspan fill="#ECEEF3" class="b">  Moving your work</tspan></text></g>
+<g class="l a42"><text x="561" y="641"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Stopping T3 on 192.0.2.10 </tspan><tspan fill="#8B90A0">2s</tspan></text></g>
+<g class="l a44"><text x="561" y="662"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Clearing T3 data on 198.51.100.4 </tspan><tspan fill="#8B90A0">1s</tspan></text></g>
+<g class="l a50"><text x="561" y="683"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Copying 3.1 GB </tspan><tspan fill="#8B90A0">3.1 GB sent </tspan><tspan fill="#8B90A0">1m 48s</tspan></text></g>
+<g class="l a52"><text x="561" y="704"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Retiring T3 on 192.0.2.10 </tspan><tspan fill="#8B90A0">1s</tspan></text></g>
+<g class="l a54"><text x="561" y="725"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Starting T3 on 198.51.100.4 </tspan><tspan fill="#8B90A0">2s</tspan></text></g>
+<g class="l a57"><text x="561" y="746"><tspan fill="#4ADE80">6/7</tspan><tspan fill="#ECEEF3" class="b">  Logins on 198.51.100.4</tspan></text></g>
+<g class="l a59"><text x="561" y="767"><tspan fill="#7AA2F7">    ◆ </tspan><tspan fill="#ECEEF3" class="b">Tailscale  </tspan><tspan fill="#8B90A0">Open the link and sign in with the same</tspan></text></g>
+<g class="l a59"><text x="561" y="788"><tspan fill="#8B90A0">      account as your laptop.</tspan></text></g>
+<g class="l a61"><text x="561" y="809"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Tailscale </tspan><tspan fill="#8B90A0">signed in</tspan></text></g>
+<g class="l a63"><text x="561" y="830"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Claude </tspan><tspan fill="#8B90A0">signed in</tspan></text></g>
+<g class="l a65"><text x="561" y="851"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">GitHub </tspan><tspan fill="#8B90A0">signed in</tspan></text></g>
+<g class="l a67"><text x="561" y="872"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">T3 Connect </tspan><tspan fill="#8B90A0">signed in</tspan></text></g>
+<g class="l a69"><text x="561" y="893"><tspan fill="#4ADE80">7/7</tspan><tspan fill="#ECEEF3" class="b">  Final check</tspan></text></g>
+<g class="l a71"><text x="561" y="914"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Rebooting </tspan><tspan fill="#8B90A0">15s</tspan></text></g>
+<g class="l a73"><text x="561" y="935"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Waiting for the server to come back </tspan><tspan fill="#8B90A0">29s</tspan></text></g>
+<g class="l a75"><text x="561" y="956"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">T3 Code, Docker and Tailscale running </tspan><tspan fill="#8B90A0">3s</tspan></text></g>
+<g class="l a78"><rect x="561" y="970" width="500" height="80" rx="8" fill="none" stroke="#4ADE80"/><text x="577" y="994"><tspan fill="#4ADE80" class="b">✓ Moved.</tspan><tspan fill="#ECEEF3"> Everything from 192.0.2.10 now lives on</tspan></text><text x="577" y="1015" fill="#8B90A0">198.51.100.4. Your threads continue in T3 Code where</text><text x="577" y="1036" fill="#8B90A0">they left off.</text><rect class="cursor" x="561" y="1058" width="8" height="15" fill="#ECEEF3"/></g>
 </g></g>
 </svg>
