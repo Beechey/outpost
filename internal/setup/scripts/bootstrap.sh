@@ -7,7 +7,7 @@ task() { echo "::task $*"; }
 # Retry downloads: a flaky connection shouldn't fail the whole install.
 fetch() { curl -fsSL --retry 5 --retry-delay 2 --retry-all-errors "$@"; }
 
-DEV_USER=dev # must match DevUser in internal/setup/setup.go
+DEV_USER=dev # must match DevUser in internal/setup/dev.go
 [ "$(id -u)" -eq 0 ] || { echo "Run as root (sudo bash bootstrap.sh)"; exit 1; }
 export DEBIAN_FRONTEND=noninteractive
 

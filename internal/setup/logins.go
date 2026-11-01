@@ -6,7 +6,6 @@ import (
 
 	"charm.land/lipgloss/v2"
 
-	"github.com/Beechey/outpost/internal/remote"
 	"github.com/Beechey/outpost/internal/ui"
 )
 
@@ -45,16 +44,14 @@ var logins = []login{
 	},
 }
 
-const userPath = `export PATH="$HOME/.local/bin:$PATH"; `
-
-func runLogins(ctx context.Context, srv remote.Server) error {
+func runLogins(ctx context.Context, d dev) error {
 	for _, l := range logins {
-		if devCheck(ctx, srv, l.Check) {
+		if d.ok(ctx, l.Check) {
 			ui.Check(l.Name, "already signed in")
 			continue
 		}
 		lipgloss.Println("\n  " + ui.Accent.Render("◆") + " " + ui.Bold.Render(l.Name) + "  " + ui.Muted.Render(l.Hint))
-		if err := srv.Interactive(ctx, DevUser, userPath+l.Run); err != nil {
+		if err := d.interactive(ctx, l.Run); err != nil {
 			return fmt.Errorf("%s sign-in didn't finish. Run the same command again to retry: %w", l.Name, err)
 		}
 		ui.Check(l.Name, "signed in")

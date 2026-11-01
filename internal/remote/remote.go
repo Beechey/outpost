@@ -1,4 +1,5 @@
-// Package remote runs commands on a server through the system ssh binary, so
+// Package remote runs commands on servers. Host is the interface the setup and
+// move flows depend on; Server is its adapter over the system ssh binary, so
 // the user's keys, agent and ~/.ssh/config work as usual.
 package remote
 
@@ -17,11 +18,59 @@ import (
 	"strings"
 )
 
-// Server is an SSH-reachable machine. Port 0 leaves the port to ssh, so
+// Host is a server that commands run on, as a given user.
+type Host interface {
+	// String names the host for messages and records: "host", or "host:port".
+	String() string
+	// CanLogin reports whether user can log in with a key, without prompting.
+	CanLogin(ctx context.Context, user string) bool
+	// CopyID installs the local public key for user, prompting for their password.
+	CopyID(ctx context.Context, user string) error
+	// Output runs a shell command and returns its stdout, even when it fails.
+	Output(ctx context.Context, user, cmd string) ([]byte, error)
+	// Interactive runs a shell command with the terminal attached, so it can prompt.
+	Interactive(ctx context.Context, user, cmd string) error
+	// RunStreaming runs a script, calling onLine for each line of its combined output.
+	RunStreaming(ctx context.Context, user string, sc Script, onLine func(string)) error
+	// CopyTo pipes srcCmd's output on this host into dstCmd on dst, both as user,
+	// calling progress with the running byte count.
+	CopyTo(ctx context.Context, dst Host, user, srcCmd, dstCmd string, progress func(int64)) error
+}
+
+// Script is a shell script to upload and run.
+type Script struct {
+	Body   []byte
+	AsRoot bool // run with sudo
+}
+
+// Server is a Host reached with ssh. Port 0 leaves the port to ssh, so
 // ~/.ssh/config applies; otherwise it's 22.
 type Server struct {
-	Host string
+	Addr string
 	Port int
+}
+
+var _ Host = Server{}
+
+// No leading "-", so an address can't be read as an ssh option.
+var addrRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9.:-]*$`)
+
+// Validate checks the server is safe to pass to ssh and to name in remote shell commands.
+func (s Server) Validate() error {
+	if !addrRe.MatchString(s.Addr) {
+		return fmt.Errorf("%q doesn't look like a server address", s.Addr)
+	}
+	if s.Port < 0 || s.Port > 65535 {
+		return fmt.Errorf("port %d is out of range", s.Port)
+	}
+	return nil
+}
+
+func (s Server) String() string {
+	if s.Port == 0 {
+		return s.Addr
+	}
+	return s.Addr + ":" + strconv.Itoa(s.Port)
 }
 
 var baseOpts = []string{"-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=10"}
@@ -35,58 +84,30 @@ func (s Server) sshArgs(extra ...string) []string {
 }
 
 func (s Server) command(ctx context.Context, user string, opts []string, remoteCmd ...string) *exec.Cmd {
-	args := append(s.sshArgs(opts...), user+"@"+s.Host)
+	args := append(s.sshArgs(opts...), user+"@"+s.Addr)
 	return exec.CommandContext(ctx, "ssh", append(args, remoteCmd...)...)
 }
 
-// CanLogin reports whether user can log in with a key, without prompting.
 func (s Server) CanLogin(ctx context.Context, user string) bool {
 	return s.command(ctx, user, []string{"-o", "BatchMode=yes"}, "true").Run() == nil
 }
 
-// CopyID installs the local public key for user, prompting for their password.
 func (s Server) CopyID(ctx context.Context, user string) error {
-	cmd := exec.CommandContext(ctx, "ssh-copy-id", append(s.sshArgs(), user+"@"+s.Host)...)
-	return attach(cmd).Run()
+	return attach(exec.CommandContext(ctx, "ssh-copy-id", append(s.sshArgs(), user+"@"+s.Addr)...)).Run()
 }
 
-// Run runs remoteCmd and streams its output.
-func (s Server) Run(ctx context.Context, user, remoteCmd string) error {
-	cmd := s.command(ctx, user, nil, remoteCmd)
-	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-	return cmd.Run()
-}
-
-// Output runs remoteCmd and returns its stdout, even when it fails.
-func (s Server) Output(ctx context.Context, user, remoteCmd string) ([]byte, error) {
+func (s Server) Output(ctx context.Context, user, cmd string) ([]byte, error) {
 	var stderr bytes.Buffer
-	cmd := s.command(ctx, user, nil, remoteCmd)
-	cmd.Stderr = &stderr
-	out, err := cmd.Output()
+	c := s.command(ctx, user, nil, cmd)
+	c.Stderr = &stderr
+	out, err := c.Output()
 	return out, withStderr(err, &stderr)
 }
 
-// withStderr adds a command's error output to its error, when there is any.
-func withStderr(err error, stderr *bytes.Buffer) error {
-	if msg := strings.TrimSpace(stderr.String()); err != nil && msg != "" {
-		return fmt.Errorf("%w: %s", err, msg)
-	}
-	return err
+func (s Server) Interactive(ctx context.Context, user, cmd string) error {
+	return attach(s.command(ctx, user, []string{"-t"}, cmd)).Run()
 }
 
-// Script is a shell script to run on the server as `Runner <script>`.
-type Script struct {
-	Body   []byte
-	Runner string // e.g. "bash" or "sudo bash"
-}
-
-// Interactive runs remoteCmd with a terminal attached, so it can prompt.
-func (s Server) Interactive(ctx context.Context, user, remoteCmd string) error {
-	return attach(s.command(ctx, user, []string{"-t"}, remoteCmd)).Run()
-}
-
-// RunStreaming runs script without a terminal, calling onLine for each line of
-// combined stdout and stderr.
 func (s Server) RunStreaming(ctx context.Context, user string, sc Script, onLine func(string)) error {
 	remoteCmd, err := s.upload(ctx, user, sc)
 	if err != nil {
@@ -128,33 +149,41 @@ func (s Server) upload(ctx context.Context, user string, sc Script) (string, err
 	if !tmpPath.MatchString(path) { // it goes into a shell command below
 		return "", fmt.Errorf("upload script: unexpected temporary file %q", path)
 	}
-	return sc.Runner + " " + path + "; s=$?; rm -f " + path + "; exit $s", nil
+	runner := "bash"
+	if sc.AsRoot {
+		runner = "sudo bash"
+	}
+	return runner + " " + path + "; s=$?; rm -f " + path + "; exit $s", nil
 }
 
-// Copy pipes the output of srcCmd on src straight into dstCmd on dst, both as
-// user, calling progress with the running byte count.
-func Copy(ctx context.Context, src, dst Server, user, srcCmd, dstCmd string, progress func(int64)) error {
+// CopyTo streams between two ssh servers through this machine.
+func (s Server) CopyTo(ctx context.Context, dst Host, user, srcCmd, dstCmd string, progress func(int64)) error {
+	to, ok := dst.(Server)
+	if !ok {
+		return fmt.Errorf("can only copy between ssh servers, not to %T", dst)
+	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+
 	var srcErr, dstErr bytes.Buffer
-	from := src.command(ctx, user, nil, srcCmd)
-	from.Stderr = &srcErr
-	out, err := from.StdoutPipe()
+	reader := s.command(ctx, user, nil, srcCmd)
+	reader.Stderr = &srcErr
+	out, err := reader.StdoutPipe()
 	if err != nil {
 		return err
 	}
-	to := dst.command(ctx, user, nil, dstCmd)
-	to.Stderr = &dstErr
-	in, err := to.StdinPipe()
+	writer := to.command(ctx, user, nil, dstCmd)
+	writer.Stderr = &dstErr
+	in, err := writer.StdinPipe()
 	if err != nil {
 		return err
 	}
-	if err := to.Start(); err != nil {
+	if err := writer.Start(); err != nil {
 		return err
 	}
-	if err := from.Start(); err != nil {
+	if err := reader.Start(); err != nil {
 		in.Close()
-		_ = to.Wait()
+		_ = writer.Wait()
 		return err
 	}
 	_, copyErr := io.Copy(in, &countingReader{r: out, progress: progress})
@@ -162,14 +191,14 @@ func Copy(ctx context.Context, src, dst Server, user, srcCmd, dstCmd string, pro
 	if copyErr != nil {
 		cancel() // the destination stopped reading; stop the source rather than let it block forever
 	}
-	toErr, fromErr := to.Wait(), from.Wait()
+	writeErr, readErr := writer.Wait(), reader.Wait()
 	switch {
-	case fromErr != nil && copyErr == nil: // the source failed on its own
-		return fmt.Errorf("read from %s: %w", src.Host, withStderr(fromErr, &srcErr))
-	case toErr != nil:
-		return fmt.Errorf("write to %s: %w", dst.Host, withStderr(toErr, &dstErr))
-	case fromErr != nil:
-		return fmt.Errorf("read from %s: %w", src.Host, withStderr(fromErr, &srcErr))
+	case readErr != nil && copyErr == nil: // the source failed on its own
+		return fmt.Errorf("read from %s: %w", s, withStderr(readErr, &srcErr))
+	case writeErr != nil:
+		return fmt.Errorf("write to %s: %w", to, withStderr(writeErr, &dstErr))
+	case readErr != nil:
+		return fmt.Errorf("read from %s: %w", s, withStderr(readErr, &srcErr))
 	}
 	return copyErr
 }
@@ -185,6 +214,14 @@ func (c *countingReader) Read(p []byte) (int, error) {
 	c.n += int64(n)
 	c.progress(c.n)
 	return n, err
+}
+
+// withStderr adds a command's error output to its error, when there is any.
+func withStderr(err error, stderr *bytes.Buffer) error {
+	if msg := strings.TrimSpace(stderr.String()); err != nil && msg != "" {
+		return fmt.Errorf("%w: %s", err, msg)
+	}
+	return err
 }
 
 func attach(cmd *exec.Cmd) *exec.Cmd {

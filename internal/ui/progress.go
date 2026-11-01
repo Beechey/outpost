@@ -26,6 +26,13 @@ func Header(n, total int, msg string) {
 	lipgloss.Println("\n" + Accent.Render(fmt.Sprintf("%d/%d", n, total)) + "  " + Bold.Render(msg))
 }
 
+var doneBox = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(Accent.GetForeground()).Padding(0, 2)
+
+// Done prints the closing summary of a flow in a box.
+func Done(text string) {
+	lipgloss.Println("\n" + doneBox.Render(text))
+}
+
 // Check prints a finished item: "✓ name note".
 func Check(name, note string) {
 	lipgloss.Println("  " + Accent.Render("✓") + " " + name + " " + Muted.Render(note))
