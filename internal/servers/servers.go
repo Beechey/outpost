@@ -12,10 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"charm.land/huh/v2"
-	"github.com/charmbracelet/x/term"
-
 	"github.com/Beechey/outpost/internal/remote"
+	"github.com/Beechey/outpost/internal/ui"
 )
 
 // Parse reads a server written as "host" or "host:port". An IPv6 address
@@ -60,9 +58,6 @@ func Forget(srv remote.Server) error {
 
 // Pick asks which server to use: one from the list (leaving out exclude), or a new address.
 func Pick(ctx context.Context, title string, exclude ...remote.Server) (remote.Server, error) {
-	if !term.IsTerminal(os.Stdin.Fd()) {
-		return remote.Server{}, errors.New("give the server's address, for example 203.0.113.7 or 203.0.113.7:2222")
-	}
 	known := List()
 	for _, e := range exclude {
 		known = without(known, e)
@@ -71,31 +66,32 @@ func Pick(ctx context.Context, title string, exclude ...remote.Server) (remote.S
 	const another = ""
 	choice := another
 	if len(known) > 0 {
-		options := make([]huh.Option[string], 0, len(known)+1)
+		options := make([]ui.Option, 0, len(known)+1)
 		for _, srv := range known {
-			options = append(options, huh.NewOption(srv.String(), srv.String()))
+			options = append(options, ui.Option{Label: srv.String(), Value: srv.String()})
 		}
-		options = append(options, huh.NewOption("Another server…", another))
-		err := huh.NewForm(huh.NewGroup(
-			huh.NewSelect[string]().Title(title).Options(options...).Value(&choice),
-		)).RunWithContext(ctx)
-		if err != nil {
-			return remote.Server{}, err
+		options = append(options, ui.Option{Label: "Another server…", Value: another})
+		var err error
+		if choice, err = ui.Ask.Choose(ctx, title, options, known[0].String()); err != nil {
+			return remote.Server{}, pickErr(err)
 		}
 	}
 	if choice == another {
-		err := huh.NewForm(huh.NewGroup(
-			huh.NewInput().Title(title).
-				Description("Its IP address or hostname, with :port if SSH isn't on 22.").
-				Placeholder("203.0.113.7").
-				Validate(func(s string) error { _, err := Parse(s); return err }).
-				Value(&choice),
-		)).RunWithContext(ctx)
+		var err error
+		choice, err = ui.Ask.Input(ctx, title, "Its IP address or hostname, with :port if SSH isn't on 22.", "203.0.113.7",
+			func(s string) error { _, err := Parse(s); return err })
 		if err != nil {
-			return remote.Server{}, err
+			return remote.Server{}, pickErr(err)
 		}
 	}
 	return Parse(choice)
+}
+
+func pickErr(err error) error {
+	if errors.Is(err, ui.ErrNoTerminal) {
+		return errors.New("give the server's address, for example 203.0.113.7 or 203.0.113.7:2222")
+	}
+	return err
 }
 
 func without(list []remote.Server, srv remote.Server) []remote.Server {

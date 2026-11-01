@@ -5,7 +5,8 @@
 #      uncommitted changes, an unpushed branch, Claude settings and a session.
 #   2. Runs `outpost move old new` and checks everything arrived, nothing secret did,
 #      T3 runs on the new server after a reboot, and the old one is retired.
-#   3. Runs the move again to check a re-run is safe.
+#   3. Backs up the new server and checks the file holds the work and T3 runs again.
+#   4. Runs the move again to check a re-run is safe.
 #
 # Logins need a human, so on the new server tiny stand-ins answer "signed in".
 # Usage: test/e2e/run.sh   (needs Docker, Go and ~/.ssh/id_ed25519)
@@ -16,7 +17,13 @@ ROOT=../.. OLD=2297 NEW=2298 BIN="$(mktemp -d)/outpost"
 ssh_to() { ssh -p "$1" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR "$2@localhost" "${@:3}"; }
 check() { if eval "$2"; then echo "  ok: $1"; else echo "  FAIL: $1"; return 1; fi; }
 
-cleanup() { docker rm -f -v outpost-e2e-old outpost-e2e-new >/dev/null 2>&1 || true; }
+cleanup() {
+  docker rm -f -v outpost-e2e-old outpost-e2e-new >/dev/null 2>&1 || true
+  # outpost remembers the servers it sets up; keep these test ones out of your list.
+  for list in "$HOME/Library/Application Support/outpost/servers" "${XDG_CONFIG_HOME:-$HOME/.config}/outpost/servers"; do
+    if [ -f "$list" ]; then sed -i.bak -e "/^localhost:$OLD$/d" -e "/^localhost:$NEW$/d" "$list" && rm -f "$list.bak"; fi
+  done
+}
 trap cleanup EXIT
 cleanup
 
@@ -41,6 +48,7 @@ done
 check "root SSH is off" '! ssh_to $OLD root -o BatchMode=yes true 2>/dev/null'
 check "re-running bootstrap is safe" \
   'ssh_to $OLD dev "cat > /tmp/b.sh && sudo bash /tmp/b.sh" < "$ROOT/internal/setup/scripts/bootstrap.sh" >/dev/null 2>&1'
+check "security updates on" 'ssh_to $OLD dev "apt-config dump APT::Periodic::Unattended-Upgrade" | grep -q "\"1\""'
 
 echo "--- give the old server some work"
 ssh_to $OLD dev 'set -e; export PATH=$HOME/.local/bin:$PATH
@@ -92,6 +100,17 @@ check "files untouched" 'ssh_to $OLD dev "cat ~/code/Hello-World/notes.txt" | gr
 "$BIN" setup localhost:$OLD </dev/null > /tmp/outpost-e2e-revive.log 2>&1 || true
 check "setup refuses to revive it" 'grep -q retired /tmp/outpost-e2e-revive.log && ! grep -q Installing /tmp/outpost-e2e-revive.log' ||
   { cat /tmp/outpost-e2e-revive.log; exit 1; }
+
+echo "--- outpost status"
+"$BIN" status localhost:$NEW </dev/null > /tmp/outpost-e2e-status.log 2>&1 || { cat /tmp/outpost-e2e-status.log; exit 1; }
+check "status shows it healthy" 'grep -q "T3 Code, Docker and Tailscale running" /tmp/outpost-e2e-status.log && grep -q "Access T3 Connect" /tmp/outpost-e2e-status.log'
+
+echo "--- outpost backup"
+BACKUP="$(mktemp -d)/new.tar.gz"
+"$BIN" backup localhost:$NEW "$BACKUP" --yes </dev/null > /tmp/outpost-e2e-backup.log 2>&1 || { cat /tmp/outpost-e2e-backup.log; exit 1; }
+check "backup has uncommitted work" 'tar -xzOf "$BACKUP" code/Hello-World/notes.txt | grep -q wip'
+check "backup has T3 threads" 'tar -tzf "$BACKUP" | grep -q "^.t3/userdata/statev2.sqlite"'
+check "T3 running again after backup" '[ "$(on_new "systemctl --user is-active t3code.service")" = active ]'
 
 echo "--- re-running the move is safe"
 "$BIN" move localhost:$OLD localhost:$NEW --yes </dev/null > /tmp/outpost-e2e-rerun.log 2>&1

@@ -38,6 +38,11 @@ func Check(name, note string) {
 	lipgloss.Println("  " + Accent.Render("✓") + " " + name + " " + Muted.Render(note))
 }
 
+// Problem prints something wrong and how to fix it: "✗ name note. Fix: fix".
+func Problem(name, note, fix string) {
+	lipgloss.Println("  " + failed.Render("✗") + " " + name + " " + Muted.Render(note+". Fix: ") + fix)
+}
+
 // Progress shows one line per task: a spinner while it runs, then ✓ and its duration.
 type Progress struct {
 	mu      sync.Mutex
