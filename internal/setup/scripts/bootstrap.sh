@@ -26,9 +26,15 @@ task "Docker"
 # Docker publishes ports past ufw, so bind published ports to localhost by default.
 # Otherwise an agent's `docker run -p 5432:5432 postgres` is open to the internet.
 mkdir -p /etc/docker
-[ -f /etc/docker/daemon.json ] || echo '{ "ip": "127.0.0.1" }' > /etc/docker/daemon.json
+new_config=false
+if [ ! -f /etc/docker/daemon.json ]; then
+  echo '{ "ip": "127.0.0.1" }' > /etc/docker/daemon.json
+  new_config=true
+fi
 command -v docker >/dev/null || fetch https://get.docker.com | sh
-systemctl enable docker && systemctl restart docker
+systemctl enable --now docker
+# Restart only to apply new config: on a re-run, a restart would stop the agents' containers.
+if $new_config; then systemctl restart docker; fi
 
 task "Tailscale"
 command -v tailscale >/dev/null || fetch https://tailscale.com/install.sh | sh

@@ -67,16 +67,27 @@ Your agents keep working while your laptop is closed. You check in from your lap
 
 ## Quick start
 
-### 1. On your laptop (once)
+### What you need
 
-You need:
+**Accounts.** outpost signs the server in to each of these, so have them ready:
+
+| Account | Cost | Used for |
+|---|---|---|
+| [Claude](https://claude.ai) | Pro or Max subscription | The agents |
+| [GitHub](https://github.com) | Free | Cloning and pushing your repos |
+| [Tailscale](https://tailscale.com) | Free | A private connection between your devices and the server |
+| [T3 Connect](https://t3.codes) | Free (up to 3 machines) | Reaching the server from T3 Code anywhere |
+
+**On your laptop:**
 
 - **macOS or Linux** (`ssh` is built in)
 - **[Go 1.26+](https://go.dev/dl/)** (`brew install go` on a Mac)
 - **[T3 Code](https://t3.codes)**: the desktop app, signed in to T3 Connect
-- **[Tailscale](https://tailscale.com/download)** (optional): lets you reach the server's dev servers and SSH privately
+- **[Tailscale](https://tailscale.com/download)**: the app, signed in. Use the same account for the server later
 
-Install outpost:
+**A server:** a fresh **Ubuntu 24.04** machine you can reach over SSH as root. See [step 2](#2-get-a-server).
+
+### 1. Install outpost (once)
 
 ```bash
 go install github.com/Beechey/outpost/cmd/outpost@latest
@@ -95,7 +106,9 @@ echo 'export PATH="$HOME/go/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc
 
 ### 2. Get a server
 
-Create a server with **Ubuntu 24.04**. Note its **IP address**. If the provider offers to add an SSH key, add the contents of `~/.ssh/id_ed25519.pub`. If it only gives you a root password, that's fine: outpost asks for it once.
+Create a server with **Ubuntu 24.04** and note its **IP address** and **root password**.
+
+If the provider offers to add an SSH key and you already have one, paste in the output of `cat ~/.ssh/id_ed25519.pub`. If you don't have a key, or the provider only gives you a password, that's fine: outpost creates a key if needed and asks for the root password once.
 
 Sizing: agents use little CPU but plenty of memory. **8 GB RAM** runs a few agents at once; **16–32 GB** runs many.
 
@@ -118,11 +131,13 @@ It then walks you through these, in order:
 | Root password | Only if your SSH key isn't on the server yet. Typed once. |
 | **Tailscale** | Open the link and sign in with the **same account as your laptop**. |
 | **Claude** | Open the link, approve, and paste the code back into the terminal. |
-| **GitHub** | Copy the code shown, press Enter, open the link, and paste the code. |
+| **GitHub** | Answer **Yes** to "Authenticate Git", then open <https://github.com/login/device> on your laptop and enter the code shown. |
 | **T3 Connect** | Open the link, check the code matches, and approve. |
 | **Repos** | Tick repos from a list of everything your GitHub account can see, including organizations. Space to select, `/` to filter, Enter to confirm. |
 
 Then it reboots the server and checks everything comes back. When you see **All set**, open T3 Code: the server appears next to your laptop under **Settings → Environments**.
+
+If anything fails, run the same command again. Finished steps are skipped.
 
 ## Using it day to day
 
@@ -145,11 +160,13 @@ T3, Tailscale, Docker, your logins and your threads all come back by themselves.
 
 | To… | Do this |
 |---|---|
-| Add repos | `outpost setup YOUR_SERVER_IP you/new-repo` (steps already done are skipped) |
+| Add repos | `outpost setup YOUR_SERVER_IP` and tick them, or name them: `outpost setup YOUR_SERVER_IP you/new-repo` |
 | Repair a broken server | `outpost setup YOUR_SERVER_IP` |
 | Update tools | `ssh dev@YOUR_SERVER_IP`, then `t3 update`, `claude update`, `sudo apt update && sudo apt upgrade -y` |
 | Move to a new server | Push unfinished work, run `outpost setup NEW_IP`, then remove the old environment in T3 under **Settings → Environments** |
 | Use a non-standard SSH port | `outpost setup -p 2222 YOUR_SERVER_IP` |
+
+Re-runs skip everything already done and **don't reboot**: they check that T3, Docker and Tailscale are running instead. Adding repos does restart T3 for a few seconds (it has to, to register projects), so an agent mid-turn stops. Open its thread and say "continue".
 
 A free T3 Connect account links up to 3 machines, so remove servers you no longer use.
 
@@ -182,7 +199,8 @@ Everything runs as a normal user called **`dev`**. Repos live in `~/code`.
 | `REMOTE HOST IDENTIFICATION HAS CHANGED` | You reinstalled the server. Run `ssh-keygen -R YOUR_SERVER_IP`, then try again. |
 | `can't log in as root` | Check the IP and root password. Some providers email the password, or let you set one in their panel. |
 | A login step failed | Run the same `outpost setup` command again. Finished steps are skipped. |
-| Server doesn't appear in T3 | `ssh dev@YOUR_SERVER_IP`, then `t3 service status`. If it isn't running: `t3 service restart`. |
+| Server doesn't appear in T3 | `ssh dev@YOUR_SERVER_IP`, then `t3 connect status` and `t3 service status`. If the service isn't running: `t3 service restart`. |
+| Some org repos are missing from the list | The org restricts third-party apps. An org owner approves **GitHub CLI** under the org's Settings → Third-party access. |
 | Agent says Claude isn't logged in | `ssh dev@YOUR_SERVER_IP`, then `claude auth login`. |
 | Can't SSH in at all | Use your provider's web console and log in as `root`, then check `ufw status` and `systemctl status ssh`. |
 

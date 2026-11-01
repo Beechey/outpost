@@ -81,6 +81,8 @@ func Run(ctx context.Context, o Options) error {
 		return err
 	}
 	lipgloss.Println("  " + ui.Muted.Render("Logged in as "+admin))
+	// A server that already runs T3 may have agents working, so re-runs check health instead of rebooting.
+	inUse := admin == DevUser && srvOK(ctx, srv, "t3 status --json | jq -e .service.installed")
 
 	ui.Header(3, totalSteps, "Installing (3-5 minutes)")
 	install := remote.Script{Body: bootstrapScript, Runner: "sudo bash"}
@@ -106,8 +108,12 @@ func Run(ctx context.Context, o Options) error {
 		return fmt.Errorf("repo setup failed (see above): %w", err)
 	}
 
-	ui.Header(6, totalSteps, "Reboot check")
-	if err := rebootCheck(ctx, srv); err != nil {
+	if inUse {
+		ui.Header(6, totalSteps, "Health check")
+	} else {
+		ui.Header(6, totalSteps, "Reboot check")
+	}
+	if err := checkServices(ctx, srv, !inUse); err != nil {
 		return err
 	}
 
@@ -163,10 +169,40 @@ func adminUser(ctx context.Context, srv remote.Server) (string, error) {
 	return "root", nil
 }
 
-func rebootCheck(ctx context.Context, srv remote.Server) (err error) {
+// srvOK reports whether a check run as the dev user succeeds.
+func srvOK(ctx context.Context, srv remote.Server, check string) bool {
+	_, err := srv.Output(ctx, DevUser, userPath+check)
+	return err == nil
+}
+
+// checkServices confirms T3, Docker and Tailscale are running, after first
+// rebooting the server if reboot is set, to prove they start by themselves.
+func checkServices(ctx context.Context, srv remote.Server, reboot bool) (err error) {
 	p := ui.NewProgress()
 	defer func() { p.Done(err) }()
+	if reboot {
+		if err := rebootAndWait(ctx, srv, p); err != nil {
+			return err
+		}
+	}
 
+	p.Task("T3 Code, Docker and Tailscale running")
+	// Prints "<service> <state>" per line; is-active exits non-zero for stopped units, so ignore the exit code.
+	out, _ := srv.Output(ctx, DevUser, `for u in docker tailscaled; do echo "$u $(systemctl is-active $u)"; done; `+
+		`echo "T3 $(systemctl --user is-active t3code.service)"`)
+	var down []string
+	for line := range strings.Lines(string(out)) {
+		if name, state, _ := strings.Cut(strings.TrimSpace(line), " "); state != "active" {
+			down = append(down, name+" is "+state)
+		}
+	}
+	if len(down) > 0 || len(out) == 0 {
+		return fmt.Errorf("not everything is running (%s). Run the same command again to repair it", strings.Join(down, ", "))
+	}
+	return nil
+}
+
+func rebootAndWait(ctx context.Context, srv remote.Server, p *ui.Progress) error {
 	p.Task("Rebooting")
 	_ = srv.Run(ctx, DevUser, "sudo systemctl reboot >/dev/null 2>&1") // the connection drops as the server goes down
 	if err := sleep(ctx, 15*time.Second); err != nil {
@@ -184,12 +220,6 @@ func rebootCheck(ctx context.Context, srv remote.Server) (err error) {
 		}
 	}
 
-	p.Task("T3 Code, Docker and Tailscale started by themselves")
-	out, err := srv.Output(ctx, DevUser,
-		"systemctl is-active docker tailscaled && systemctl --user is-active t3code.service")
-	if err != nil {
-		return fmt.Errorf("something didn't start after the reboot: %s\nRun the same command again to repair it", strings.TrimSpace(string(out)))
-	}
 	return nil
 }
 
