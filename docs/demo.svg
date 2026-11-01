@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="608" viewBox="0 0 760 608" role="img" aria-label="Animated terminal: outpost setup installs, signs in and reboot-checks a server">
+<style>
+text { font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; font-size: 14px; white-space: pre; }
+.b { font-weight: 700; }
+g.l { opacity: 0; animation-duration: 16s; animation-iteration-count: infinite; animation-timing-function: steps(1, end); }
+@keyframes cursor { 0%, 49% { opacity: 1 } 50%, 100% { opacity: 0 } }
+.cursor { animation: cursor 1s infinite; }
+@keyframes l0 { 0% { opacity: 0 } 2% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } }
+.l0 { animation-name: l0; }
+@keyframes l1 { 0% { opacity: 0 } 6% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } }
+.l1 { animation-name: l1; }
+@keyframes l2 { 0% { opacity: 0 } 8% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } }
+.l2 { animation-name: l2; }
+@keyframes l3 { 0% { opacity: 0 } 11% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } }
+.l3 { animation-name: l3; }
+@keyframes l4 { 0% { opacity: 0 } 13% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } }
+.l4 { animation-name: l4; }
+@keyframes l5 { 0% { opacity: 0 } 16% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } }
+.l5 { animation-name: l5; }
+@keyframes l6 { 0% { opacity: 0 } 19% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } }
+.l6 { animation-name: l6; }
+@keyframes l7 { 0% { opacity: 0 } 22% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } }
+.l7 { animation-name: l7; }
+@keyframes l8 { 0% { opacity: 0 } 25% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } }
+.l8 { animation-name: l8; }
+@keyframes l9 { 0% { opacity: 0 } 28% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } }
+.l9 { animation-name: l9; }
+@keyframes l10 { 0% { opacity: 0 } 31% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } }
+.l10 { animation-name: l10; }
+@keyframes l11 { 0% { opacity: 0 } 34% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } }
+.l11 { animation-name: l11; }
+@keyframes l12 { 0% { opacity: 0 } 38% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } }
+.l12 { animation-name: l12; }
+@keyframes l13 { 0% { opacity: 0 } 41% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } }
+.l13 { animation-name: l13; }
+@keyframes l14 { 0% { opacity: 0 } 45% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } }
+.l14 { animation-name: l14; }
+@keyframes l15 { 0% { opacity: 0 } 49% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } }
+.l15 { animation-name: l15; }
+@keyframes l16 { 0% { opacity: 0 } 53% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } }
+.l16 { animation-name: l16; }
+@keyframes l17 { 0% { opacity: 0 } 57% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } }
+.l17 { animation-name: l17; }
+@keyframes l18 { 0% { opacity: 0 } 61% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } }
+.l18 { animation-name: l18; }
+@keyframes l19 { 0% { opacity: 0 } 64% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } }
+.l19 { animation-name: l19; }
+@keyframes l20 { 0% { opacity: 0 } 68% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } }
+.l20 { animation-name: l20; }
+@keyframes lbox { 0% { opacity: 0 } 73% { opacity: 1 } 96% { opacity: 1 } 100% { opacity: 0 } }
+.lbox { animation-name: lbox; }
+</style>
+<rect width="760" height="608" rx="14" fill="#0E1015"/>
+<rect x="0.5" y="0.5" width="759" height="607" rx="14" fill="none" stroke="#262A35"/>
+<circle cx="24" cy="22" r="6" fill="#FF5F57"/>
+<circle cx="44" cy="22" r="6" fill="#FEBC2E"/>
+<circle cx="64" cy="22" r="6" fill="#28C840"/>
+<text x="380.0" y="27" fill="#8B90A0" text-anchor="middle" style="font-size:12px">outpost</text>
+<g class="l l0"><text x="22" y="73"><tspan fill="#8B90A0">$ </tspan><tspan fill="#ECEEF3" class="b">outpost setup 203.0.113.7</tspan></text></g>
+<g class="l l1"><text x="22" y="94"><tspan fill="#4ADE80">1/5</tspan><tspan fill="#ECEEF3" class="b">  SSH key</tspan></text></g>
+<g class="l l2"><text x="22" y="115"><tspan fill="#8B90A0">    Using ~/.ssh/id_ed25519.pub</tspan></text></g>
+<g class="l l3"><text x="22" y="136"><tspan fill="#4ADE80">2/5</tspan><tspan fill="#ECEEF3" class="b">  Connecting to 203.0.113.7</tspan></text></g>
+<g class="l l4"><text x="22" y="157"><tspan fill="#8B90A0">    Logged in as root</tspan></text></g>
+<g class="l l5"><text x="22" y="178"><tspan fill="#4ADE80">3/5</tspan><tspan fill="#ECEEF3" class="b">  Installing (3-5 minutes)</tspan></text></g>
+<g class="l l6"><text x="22" y="199"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">System packages </tspan><tspan fill="#8B90A0">41s</tspan></text></g>
+<g class="l l7"><text x="22" y="220"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Node.js </tspan><tspan fill="#8B90A0">12s</tspan></text></g>
+<g class="l l8"><text x="22" y="241"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Docker </tspan><tspan fill="#8B90A0">38s</tspan></text></g>
+<g class="l l9"><text x="22" y="262"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Tailscale </tspan><tspan fill="#8B90A0">9s</tspan></text></g>
+<g class="l l10"><text x="22" y="283"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">User, SSH and firewall </tspan><tspan fill="#8B90A0">3s</tspan></text></g>
+<g class="l l11"><text x="22" y="304"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">T3 Code and Claude Code </tspan><tspan fill="#8B90A0">52s</tspan></text></g>
+<g class="l l12"><text x="22" y="325"><tspan fill="#4ADE80">4/5</tspan><tspan fill="#ECEEF3" class="b">  Logins</tspan></text></g>
+<g class="l l13"><text x="22" y="346"><tspan fill="#7AA2F7">    ◆ </tspan><tspan fill="#ECEEF3" class="b">Tailscale  </tspan><tspan fill="#8B90A0">Open the link and sign in</tspan></text></g>
+<g class="l l14"><text x="22" y="367"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Tailscale </tspan><tspan fill="#8B90A0">signed in</tspan></text></g>
+<g class="l l15"><text x="22" y="388"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Claude </tspan><tspan fill="#8B90A0">signed in</tspan></text></g>
+<g class="l l16"><text x="22" y="409"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">GitHub </tspan><tspan fill="#8B90A0">signed in</tspan></text></g>
+<g class="l l17"><text x="22" y="430"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">T3 Connect </tspan><tspan fill="#8B90A0">signed in</tspan></text></g>
+<g class="l l18"><text x="22" y="451"><tspan fill="#4ADE80">5/5</tspan><tspan fill="#ECEEF3" class="b">  Final check</tspan></text></g>
+<g class="l l19"><text x="22" y="472"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">Rebooting </tspan><tspan fill="#8B90A0">14s</tspan></text></g>
+<g class="l l20"><text x="22" y="493"><tspan fill="#4ADE80">    ✓ </tspan><tspan fill="#ECEEF3">T3 Code, Docker and Tailscale running </tspan><tspan fill="#8B90A0">3s</tspan></text></g>
+<g class="l lbox"><rect x="22" y="506.4" width="470" height="65.10000000000001" rx="8" fill="none" stroke="#4ADE80"/><text x="38" y="530.4"><tspan fill="#4ADE80" class="b">✓ All set.</tspan><tspan fill="#ECEEF3"> 203.0.113.7 is ready for your agents.</tspan></text><text x="38" y="551.4" fill="#8B90A0">Open T3 Code, pick the server, and start prompting.</text><rect class="cursor" x="22" y="577.0" width="8" height="15" fill="#ECEEF3"/></g>
+</svg>
