@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <a href="#-quick-start"><b>Quick start</b></a> ·
+  <a href="#quick-start"><b>Quick start</b></a> ·
   <a href="docs/guide.md"><b>Guide</b></a> ·
   <a href="docs/how-it-works.md"><b>How it works</b></a> ·
   <a href="CONTRIBUTING.md"><b>Contributing</b></a>
@@ -30,7 +30,7 @@
   <img src="docs/demo.svg" width="720" alt="outpost setup installing, signing in and reboot-checking a server">
 </p>
 
-## ✨ Why outpost
+## Why outpost
 
 Your agents should keep working when your laptop is closed. T3 Code runs them on any machine; outpost makes that machine.
 
@@ -38,21 +38,21 @@ Your agents should keep working when your laptop is closed. T3 Code runs them on
 <tr>
 <td width="33%" valign="top">
 
-### ⚡ One command
+### One command
 
 `outpost setup` installs, secures and signs in a bare Ubuntu server in about ten minutes. You just approve a few links.
 
 </td>
 <td width="33%" valign="top">
 
-### 🔁 Survives reboots
+### Survives reboots
 
 T3, Docker and Tailscale start at boot. outpost reboots every new server to prove it, then hands it over.
 
 </td>
 <td width="33%" valign="top">
 
-### 🚚 Moves with you
+### Moves with you
 
 `outpost move` carries your code, unpushed work, T3 threads and agent history to a new server. Threads continue where they left off.
 
@@ -61,21 +61,21 @@ T3, Docker and Tailscale start at boot. outpost reboots every new server to prov
 <tr>
 <td valign="top">
 
-### 🔒 Locked down
+### Locked down
 
 Key-only SSH, no root login, a firewall, and Docker ports that stay private.
 
 </td>
 <td valign="top">
 
-### 🌐 Your way in
+### Your way in
 
 T3 Connect from anywhere, or `--tailscale` for a free, private, unlimited tailnet setup.
 
 </td>
 <td valign="top">
 
-### 🧘 Safe to re-run
+### Safe to re-run
 
 Finished steps are skipped, and a server already in use gets a health check, never a surprise reboot.
 
@@ -83,7 +83,7 @@ Finished steps are skipped, and a server already in use gets a health check, nev
 </tr>
 </table>
 
-## 🚀 Quick start
+## Quick start
 
 **1. Install outpost** (needs [Go 1.26+](https://go.dev/dl/))
 
@@ -139,7 +139,7 @@ Approve the logins as they come up. When you see **All set**, open T3 Code, pick
 > [!TIP]
 > No root SSH key on the server? outpost asks for the root password once. Using a computer at home? See the [guide](docs/guide.md#1-get-a-server).
 
-## 🧰 Commands
+## Commands
 
 | Command | What it does |
 |---|---|
@@ -150,22 +150,23 @@ Approve the logins as they come up. When you see **All set**, open T3 Code, pick
 
 Servers are an IP or hostname, with `:port` if SSH isn't on 22.
 
-## 🌐 T3 Connect or Tailscale
+## T3 Connect or Tailscale
 
 |  | **T3 Connect** (default) | **Tailscale** (`--tailscale`) |
 |---|---|---|
-| Reach it from | 🌍 Anywhere | 🔐 Your tailnet |
-| Devices need | Nothing extra | The Tailscale app |
+| Reach it from | Anywhere | Your tailnet |
+| Devices need | Nothing extra | The Tailscale app, connected |
+| Phone notifications | Yes: agent done, needs approval, Live Activities | No, T3 sends these only through T3 Connect |
 | Cost | Free for 3 machines, more with [T3 Chat](https://t3.chat) Pro (10) or Premier (100) | Free, unlimited |
 | Add a device | Sign in to T3 Connect | `outpost pair SERVER` and scan |
 
-## 🚚 Moving servers
+## Moving servers
 
 ```bash
 outpost move 203.0.113.7 198.51.100.4
 ```
 
-| ✅ Moves | ➖ Doesn't move |
+| Moves | Doesn't move |
 |---|---|
 | Everything in `~/code`, including uncommitted work, unpushed branches and agent worktrees | Logins: approve them again, about a minute |
 | T3 Code threads, projects and settings | `node_modules`: reinstalled on demand |
@@ -173,13 +174,13 @@ outpost move 203.0.113.7 198.51.100.4
 
 The new server becomes the same environment in T3 Code. The old one is switched off with its files untouched, and if the copy fails, it starts again so nothing is lost. [More on moving →](docs/guide.md#move-to-a-new-server)
 
-## 📋 What you need
+## What you need
 
 - **Accounts:** [Claude](https://claude.ai) (Pro or Max), [GitHub](https://github.com), [Tailscale](https://tailscale.com) (free), [T3 Code](https://t3.codes) (free).
 - **Your laptop:** macOS or Linux, with the T3 Code app and Tailscale installed and signed in. Use the same Tailscale account everywhere.
 - **A server:** Ubuntu 24.04, x86 or ARM. Agents love memory: **8 GB** runs a few, **16–32 GB** runs many.
 
-## 📚 Learn more
+## Learn more
 
 - **[Guide](docs/guide.md):** every login step, home servers, Tailscale pairing, day-to-day use, troubleshooting and FAQ.
 - **[How it works](docs/how-it-works.md):** what gets installed, security, how moves and reboots work.

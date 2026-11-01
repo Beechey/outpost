@@ -66,7 +66,9 @@ If anything fails, run the same command again. Finished steps are skipped.
 | | **T3 Connect** (default) | **Tailscale** (`--tailscale`) |
 |---|---|---|
 | Reach the server from | Anywhere: laptop, phone, browser | Devices on your tailnet |
-| Devices need | Nothing extra | The Tailscale app, signed in |
+| Devices need | Nothing extra | The Tailscale app, signed in and connected |
+| Phone notifications and Live Activities | Yes | No: T3 delivers these only through T3 Connect |
+| Traffic goes | Through T3 Connect's relay | Directly between your devices, encrypted by Tailscale |
 | Cost | Free for 3 machines; [T3 Chat](https://t3.chat) Pro raises it to 10, Premier to 100 | Free, unlimited |
 | Adding a device | Sign in to T3 Connect on it | `outpost pair SERVER`, then scan the QR code |
 
@@ -76,7 +78,9 @@ outpost pair SERVER_IP                   # pair another device, such as your pho
 outpost setup SERVER_IP --connect        # switch back to T3 Connect
 ```
 
-Re-runs keep whatever a server already uses, so a Tailscale server stays on Tailscale. Pairing links work for 5 minutes.
+Re-runs keep whatever a server already uses, so a Tailscale server stays on Tailscale. Pairing links work for 5 minutes; a paired device stays paired.
+
+**Which to pick:** T3 Connect for the servers you check from your phone, since only T3 Connect gives push notifications. Tailscale for extra servers beyond your T3 Connect limit, or if you'd rather traffic didn't go through a relay.
 
 The first time, Tailscale may ask you to **enable HTTPS** for your tailnet (T3 is served over HTTPS). Do it once in the [Tailscale admin console](https://login.tailscale.com/admin/dns), then run the same command again.
 
