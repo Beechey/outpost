@@ -106,15 +106,19 @@ Download it from <https://go.dev/dl/>.
 
 **2. Install outpost**
 
-```bash
-go install github.com/Beechey/outpost/cmd/outpost@latest
-```
-
-<details>
-<summary>Repo still private? Use this instead</summary>
+The repo is private for now, so install from a clone (you need access to it, and the [GitHub CLI](https://cli.github.com) signed in):
 
 ```bash
 gh repo clone Beechey/outpost && cd outpost && go install ./cmd/outpost
+```
+
+To update later, run `git pull && go install ./cmd/outpost` in that folder.
+
+<details>
+<summary>Once the repo is public</summary>
+
+```bash
+go install github.com/Beechey/outpost/cmd/outpost@latest
 ```
 </details>
 
@@ -178,6 +182,8 @@ T3 Connect works through your home router, so you don't need to open any ports.
 outpost setup SERVER_IP
 ```
 
+If SSH on the server isn't on port 22, add the port: `outpost setup SERVER_IP:2222`. Next time, run plain `outpost setup` to pick from the servers you've set up before.
+
 It installs everything (3–5 minutes), then walks you through four logins. Each one shows a link or code: open it on your laptop and approve.
 
 | Login | What you do |
@@ -203,6 +209,8 @@ Switching providers, upgrading, or moving from a VPS to a box at home:
 ```bash
 outpost move OLD_SERVER_IP NEW_SERVER_IP
 ```
+
+Or run plain `outpost move` and pick both servers from a list.
 
 It checks the old server, sets up the new one, moves everything across, and signs the new one in. The new server takes over as **the same environment in T3 Code**, so your threads continue where they left off.
 
@@ -243,7 +251,7 @@ It checks the old server, sets up the new one, moves everything across, and sign
   </details>
 
 - **SSH in** with `ssh dev@SERVER_IP`.
-- **Repair** a server with `outpost setup SERVER_IP`. On a server already in use, it checks everything is running instead of rebooting, so working agents aren't cut off.
+- **Repair** a server with `outpost setup` (pick it from the list). On a server already in use, it checks everything is running instead of rebooting, so working agents aren't cut off.
 - **Update the tools:**
 
   ```bash
@@ -310,23 +318,27 @@ Yes. T3 Code supports them. Install and sign in to the agent's CLI on the server
 
 ```
 cmd/outpost/          CLI entry point (cobra + fang)
-internal/setup/       The setup and move flows
-  setup.go            Shared steps: connect, install, final check
+internal/setup/       The setup and move flows, written as step lists
+  setup.go            Setup, and the steps it shares with move: connect, install, final check
+  move.go             Move: survey, confirm, transfer, retire
+  manifest.go         What a move carries, and every shell command built from that
+  dev.go              The dev user on a server: PATH, quoting, T3 service operations
   logins.go           Tailscale, Claude, GitHub and T3 Connect sign-ins (skipped when done)
-  move.go             Survey, confirm, transfer, retire
-  scripts/            Shell scripts embedded in the binary and run on the server
-    bootstrap.sh      As root: packages, user, SSH, firewall, Docker, Tailscale, T3, Claude
-    survey.sh         As dev: what a move would carry over
-internal/remote/      Runs commands over the system ssh binary, and streams between servers
-internal/ui/          Step headers and live progress
+  scripts/
+    bootstrap.sh      Runs as root: packages, user, SSH, firewall, Docker, Tailscale, T3, Claude
+internal/remote/      Host, the seam the flows depend on, and Server, its ssh adapter
+internal/servers/     Remembered servers and the picker
+internal/ui/          Banner, step headers and live progress
 test/e2e/             End-to-end test with systemd containers posing as servers
 ```
 
 ```bash
-go test ./...                                          # unit tests, plus a syntax check of the scripts
+go test ./...                                          # unit tests, in under a second
 shellcheck internal/setup/scripts/*.sh test/e2e/run.sh
 test/e2e/run.sh                                        # about 10 minutes; needs Docker and ~/.ssh/id_ed25519
 ```
+
+The flows depend only on `remote.Host`, so unit tests run them against a recording fake: fresh and re-run setups, retired servers, failed copies and their undo. The move manifest's commands run against temporary folders with real `tar` (on Linux; skipped on macOS).
 
 The end-to-end test sets up an "old" server, gives it work (a T3 project, uncommitted changes, an unpushed branch, Claude settings and history), moves it to a "new" server, and checks that everything arrived, credentials didn't, T3 runs after a reboot, and a re-run is safe. Logins need a human, so small stand-ins answer for them. CI runs it on every push.
 
@@ -339,7 +351,7 @@ docker build -t outpost-try --build-arg PUBKEY="$(cat ~/.ssh/id_ed25519.pub)" .
 docker run -d --name outpost-try --privileged --cgroupns=host \
   -v /sys/fs/cgroup:/sys/fs/cgroup:rw -v /var/lib/docker -v /var/lib/containerd \
   --restart unless-stopped -p 2222:22 outpost-try
-outpost setup -p 2222 localhost
+outpost setup localhost:2222
 ```
 
 To clean up, sign the container out first so it leaves your Tailscale network and T3 Connect:
