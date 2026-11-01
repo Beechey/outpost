@@ -27,7 +27,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/demo.svg" width="720" alt="outpost setup installing, signing in and reboot-checking a server">
+  <img src="docs/demo.svg" width="100%" alt="Split terminal: outpost setup provisions a new server while outpost move carries everything from an old server to a new one">
 </p>
 
 ## Why outpost
