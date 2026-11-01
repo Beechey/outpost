@@ -347,6 +347,10 @@ func upgradeCmd() *cobra.Command {
 			}
 			install := exec.CommandContext(cmd.Context(), "go", "install", module+"@latest")
 			install.Stdout, install.Stderr = os.Stdout, os.Stderr
+			// Go's module cache can serve an older @latest for a while after a push; with git, ask GitHub directly.
+			if _, err := exec.LookPath("git"); err == nil {
+				install.Env = append(os.Environ(), "GOPROXY=direct")
+			}
 			if err := install.Run(); err != nil {
 				return fmt.Errorf("upgrade failed: %w", err)
 			}
