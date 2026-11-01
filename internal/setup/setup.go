@@ -67,6 +67,7 @@ func Run(ctx context.Context, o Options) error {
 		return err
 	}
 	srv := remote.Server{Host: o.Host, Port: o.Port}
+	lipgloss.Println("\n" + banner)
 
 	step(1, "Checking your SSH key")
 	if err := ensureKey(ctx); err != nil {
