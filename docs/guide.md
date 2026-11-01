@@ -154,7 +154,7 @@ Security fixes install by themselves every day, without rebooting. For everythin
 outpost update SERVER_IP
 ```
 
-It updates T3 Code, Claude Code and the system packages. T3 restarts on its new version, so agents mid-turn stop, and outpost asks first (`--yes` skips the question). If Docker is updated it restarts too. When an update needs a reboot to take effect, outpost says so; reboot when agents are idle with `ssh dev@SERVER_IP sudo reboot`.
+It updates T3 Code, Claude Code and the system packages on the server. To upgrade outpost itself on your laptop, run `outpost upgrade`. T3 restarts on its new version, so agents mid-turn stop, and outpost asks first (`--yes` skips the question). If Docker is updated it restarts too. When an update needs a reboot to take effect, outpost says so; reboot when agents are idle with `ssh dev@SERVER_IP sudo reboot`.
 
 ### Back it up
 

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 	"syscall"
@@ -35,7 +37,7 @@ func rootCmd() *cobra.Command {
 			"Leave one out to pick from the servers outpost has set up before.",
 		SilenceUsage: true,
 	}
-	root.AddCommand(setupCmd(), statusCmd(), accessCmd(), pairCmd(), loginCmd(), swapCmd(), updateCmd(), backupCmd(), moveCmd(), listCmd(), forgetCmd())
+	root.AddCommand(setupCmd(), statusCmd(), accessCmd(), pairCmd(), loginCmd(), swapCmd(), updateCmd(), backupCmd(), moveCmd(), listCmd(), forgetCmd(), upgradeCmd())
 	return root
 }
 
@@ -327,6 +329,59 @@ func forgetCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+// module is where outpost installs from.
+const module = "github.com/Beechey/outpost/cmd/outpost"
+
+func upgradeCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "upgrade",
+		Short: "Upgrade outpost itself to the newest version",
+		Long: "Installs the newest outpost with Go, replacing this one. To update the software\n" +
+			"on a server instead, use: outpost update SERVER",
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if _, err := exec.LookPath("go"); err != nil {
+				return errors.New("outpost upgrades itself with Go, which isn't on your PATH. Install it from https://go.dev/dl/, then run this again")
+			}
+			install := exec.CommandContext(cmd.Context(), "go", "install", module+"@latest")
+			install.Stdout, install.Stderr = os.Stdout, os.Stderr
+			if err := install.Run(); err != nil {
+				return fmt.Errorf("upgrade failed: %w", err)
+			}
+			bin, err := goBin(cmd)
+			if err != nil {
+				return err
+			}
+			installed := filepath.Join(bin, "outpost")
+			version, _ := exec.CommandContext(cmd.Context(), installed, "--version").Output()
+			fmt.Print("Upgraded: " + string(version))
+			// go install writes to Go's bin folder; an outpost run from elsewhere stays as it was.
+			if self, err := os.Executable(); err == nil && filepath.Clean(self) != filepath.Clean(installed) {
+				fmt.Printf("The new outpost is %s, but you ran %s. Put %s first on your PATH.\n", installed, self, bin)
+			}
+			return nil
+		},
+	}
+}
+
+// goBin is the folder go install writes to.
+func goBin(cmd *cobra.Command) (string, error) {
+	out, err := exec.CommandContext(cmd.Context(), "go", "env", "GOBIN", "GOPATH").Output()
+	if err != nil {
+		return "", fmt.Errorf("find Go's bin folder: %w", err)
+	}
+	return binDir(string(out)), nil
+}
+
+// binDir reads `go env GOBIN GOPATH`: one line each, GOBIN empty when unset.
+func binDir(goEnv string) string {
+	lines := strings.Split(goEnv, "\n")
+	if gobin := strings.TrimSpace(lines[0]); gobin != "" || len(lines) < 2 {
+		return gobin
+	}
+	return filepath.Join(strings.TrimSpace(lines[1]), "bin")
 }
 
 // accessFlags chooses how devices reach T3 on the server.

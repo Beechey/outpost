@@ -92,7 +92,7 @@ T3 Connect from anywhere, or Tailscale for a free, private, unlimited tailnet. S
 go install github.com/Beechey/outpost/cmd/outpost@latest
 ```
 
-Run the same command again to update it.
+Later, `outpost upgrade` brings it up to date.
 
 <details>
 <summary><b>Install Go</b></summary>
@@ -192,6 +192,7 @@ The new server becomes the same environment in T3 Code, so threads continue wher
 | `outpost backup SERVER [FILE]` | Download a server's work to a file on your laptop. |
 | `outpost move OLD NEW` | Move everything to a new server. |
 | `outpost list` / `outpost forget SERVER` | See the servers outpost remembers, or take one off the list. |
+| `outpost upgrade` | Upgrade outpost itself to the newest version. |
 
 Servers are an IP or hostname, with `:port` if SSH isn't on 22. Leave one out to pick from the servers you've set up. `setup` and `move` also take `--tailscale` or `--connect`, and `--swap GB`, to answer their questions in advance.
 
