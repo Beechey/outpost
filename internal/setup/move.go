@@ -18,8 +18,8 @@ import (
 // Move sets up a new server and moves everything from an old one onto it: code,
 // T3 threads and projects, and agent history and settings (see manifest.go).
 // The new server takes over as the same T3 environment. Safe to re-run if it
-// stops partway. yes skips the confirmation.
-func Move(ctx context.Context, old, dst remote.Server, yes bool) error {
+// stops partway. yes skips the confirmation; access is how devices reach the new server.
+func Move(ctx context.Context, old, dst remote.Server, yes bool, access Access) error {
 	for _, s := range []remote.Server{old, dst} {
 		if err := s.Validate(); err != nil {
 			return err
@@ -28,10 +28,10 @@ func Move(ctx context.Context, old, dst remote.Server, yes bool) error {
 	if old.String() == dst.String() {
 		return errors.New("the old and new server are the same")
 	}
-	return move(ctx, old, dst, yes)
+	return move(ctx, old, dst, yes, access)
 }
 
-func move(ctx context.Context, old, dst remote.Host, yes bool) error {
+func move(ctx context.Context, old, dst remote.Host, yes bool, access Access) error {
 	from, to := dev{old}, dev{dst}
 	var (
 		sv           survey
@@ -65,6 +65,7 @@ func move(ctx context.Context, old, dst remote.Host, yes bool) error {
 			if admin, inUse, err = connect(ctx, dst); err != nil {
 				return err
 			}
+			access = resolveAccess(ctx, to, admin, access)
 			if alreadyMoved || yes {
 				return nil
 			}
@@ -78,7 +79,7 @@ func move(ctx context.Context, old, dst remote.Host, yes bool) error {
 			}
 			return transfer(ctx, old, dst, sv)
 		}},
-		{"Logins on " + dst.String(), func(ctx context.Context) error { return runLogins(ctx, to) }},
+		{"Logins on " + dst.String(), func(ctx context.Context) error { return runLogins(ctx, to, access) }},
 		// A first move reboots to prove the new server starts by itself; a re-run may find agents at work there.
 		{"Final check", func(ctx context.Context) error { return finalCheck(ctx, to, !(alreadyMoved && inUse)) }},
 	})
@@ -89,7 +90,7 @@ func move(ctx context.Context, old, dst remote.Host, yes bool) error {
 		"Your threads continue in T3 Code where they left off; send any that were\n" +
 		"mid-turn a \"continue\". Projects may need their dependencies reinstalled.\n\n" +
 		ui.Muted.Render("When you're happy, delete "+old.String()+" at your provider and remove it from Tailscale.\n"+
-			"Until then its files are untouched, and T3 there stays off."))
+			"Until then its files are untouched, and T3 there stays off.\n"+accessNote(dst, access)))
 	return nil
 }
 

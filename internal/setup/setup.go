@@ -31,15 +31,16 @@ var (
 	pollInterval    = 3 * time.Second
 )
 
-// Setup prepares a server for T3 Code. It is safe to re-run on a finished server.
-func Setup(ctx context.Context, srv remote.Server) error {
+// Setup prepares a server for T3 Code, reachable the given way. It is safe to
+// re-run on a finished server.
+func Setup(ctx context.Context, srv remote.Server, access Access) error {
 	if err := srv.Validate(); err != nil {
 		return err
 	}
-	return setup(ctx, srv)
+	return setup(ctx, srv, access)
 }
 
-func setup(ctx context.Context, h remote.Host) error {
+func setup(ctx context.Context, h remote.Host, access Access) error {
 	d := dev{h}
 	var admin string
 	var inUse bool
@@ -58,10 +59,11 @@ func setup(ctx context.Context, h remote.Host) error {
 				return fmt.Errorf("this server's work was moved to %s with outpost move, so it's retired. "+
 					"Set up %s instead, or to reuse this server, delete %s on it first", to, to, movedToFile)
 			}
+			access = resolveAccess(ctx, d, admin, access)
 			return nil
 		}},
 		{"Installing (3-5 minutes)", func(ctx context.Context) error { return install(ctx, h, admin) }},
-		{"Logins", func(ctx context.Context) error { return runLogins(ctx, d) }},
+		{"Logins", func(ctx context.Context) error { return runLogins(ctx, d, access) }},
 		// A server already running T3 may have agents at work, so it gets a health check, not a reboot.
 		{"Final check", func(ctx context.Context) error { return finalCheck(ctx, d, !inUse) }},
 	})
@@ -70,7 +72,8 @@ func setup(ctx context.Context, h remote.Host) error {
 	}
 	ui.Done(ui.Accent.Render("✓ All set.") + " " + ui.Bold.Render(h.String()) + " is ready for your agents.\n\n" +
 		"In T3 Code, pick this server under Settings → Environments,\n" +
-		"add a project with ⌘K → Add Project, and start prompting.")
+		"add a project with ⌘K → Add Project, and start prompting.\n\n" +
+		ui.Muted.Render(accessNote(h, access)))
 	return nil
 }
 
