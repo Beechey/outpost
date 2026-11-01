@@ -15,7 +15,6 @@ var (
 	Accent  = lipgloss.NewStyle().Foreground(lipgloss.Color("#4ADE80"))
 	Bold    = lipgloss.NewStyle().Bold(true)
 	Muted   = lipgloss.NewStyle().Foreground(lipgloss.Color("#8B90A0"))
-	Warn    = lipgloss.NewStyle().Foreground(lipgloss.Color("#FBBF24"))
 	failed  = lipgloss.NewStyle().Foreground(lipgloss.Color("#F87171"))
 	frames  = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 	isTTY   = term.IsTerminal(os.Stdout.Fd())
@@ -27,9 +26,9 @@ func Header(n, total int, msg string) {
 	lipgloss.Println("\n" + Accent.Render(fmt.Sprintf("%d/%d", n, total)) + "  " + Bold.Render(msg))
 }
 
-// Section prints an unnumbered heading.
-func Section(msg string) {
-	lipgloss.Println("\n" + Accent.Render("◆") + "  " + Bold.Render(msg))
+// Check prints a finished item: "✓ name note".
+func Check(name, note string) {
+	lipgloss.Println("  " + Accent.Render("✓") + " " + name + " " + Muted.Render(note))
 }
 
 // Progress shows one line per task: a spinner while it runs, then ✓ and its duration.

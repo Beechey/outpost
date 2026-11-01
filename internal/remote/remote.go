@@ -6,14 +6,15 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // Server is an SSH-reachable machine. Port 0 leaves the port to ssh, so
@@ -62,18 +63,21 @@ func (s Server) Output(ctx context.Context, user, remoteCmd string) ([]byte, err
 	cmd := s.command(ctx, user, nil, remoteCmd)
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
-	if err != nil {
-		err = fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
-	}
-	return out, err
+	return out, withStderr(err, &stderr)
 }
 
-// Script is a shell script to run on the server as `Runner <script> Args...`.
-// The remote shell sees Args unquoted, so callers must validate them.
+// withStderr adds a command's error output to its error, when there is any.
+func withStderr(err error, stderr *bytes.Buffer) error {
+	if msg := strings.TrimSpace(stderr.String()); err != nil && msg != "" {
+		return fmt.Errorf("%w: %s", err, msg)
+	}
+	return err
+}
+
+// Script is a shell script to run on the server as `Runner <script>`.
 type Script struct {
 	Body   []byte
 	Runner string // e.g. "bash" or "sudo bash"
-	Args   []string
 }
 
 // Interactive runs remoteCmd with a terminal attached, so it can prompt.
@@ -100,25 +104,38 @@ func (s Server) RunStreaming(ctx context.Context, user string, sc Script, onLine
 	for scan.Scan() {
 		onLine(scan.Text())
 	}
+	if err := scan.Err(); errors.Is(err, bufio.ErrTooLong) {
+		_, _ = io.Copy(io.Discard, pr) // keep reading so ssh can finish and exit
+		return err
+	}
 	return scan.Err() // the exit error from Wait, via CloseWithError
 }
 
-// upload copies the script to the server and returns the command that runs it
-// and then deletes it, keeping its exit status.
+// tmpPath matches the files mktemp creates for uploaded scripts.
+var tmpPath = regexp.MustCompile(`^/tmp/outpost\.[A-Za-z0-9]+$`)
+
+// upload copies the script to a private temporary file on the server and
+// returns the command that runs it and then deletes it, keeping its exit status.
 func (s Server) upload(ctx context.Context, user string, sc Script) (string, error) {
-	path := fmt.Sprintf("/tmp/outpost-%d.sh", time.Now().UnixNano())
-	up := s.command(ctx, user, nil, "cat > "+path)
-	up.Stdin = bytes.NewReader(sc.Body)
-	if out, err := up.CombinedOutput(); err != nil {
-		return "", fmt.Errorf("upload script: %w: %s", err, strings.TrimSpace(string(out)))
+	var stderr bytes.Buffer
+	up := s.command(ctx, user, nil, `f=$(mktemp /tmp/outpost.XXXXXXXX) && cat > "$f" && echo "$f"`)
+	up.Stdin, up.Stderr = bytes.NewReader(sc.Body), &stderr
+	out, err := up.Output()
+	if err != nil {
+		return "", fmt.Errorf("upload script: %w", withStderr(err, &stderr))
 	}
-	run := strings.Join(append([]string{sc.Runner, path}, sc.Args...), " ")
-	return run + "; s=$?; rm -f " + path + "; exit $s", nil
+	path := strings.TrimSpace(string(out))
+	if !tmpPath.MatchString(path) { // it goes into a shell command below
+		return "", fmt.Errorf("upload script: unexpected temporary file %q", path)
+	}
+	return sc.Runner + " " + path + "; s=$?; rm -f " + path + "; exit $s", nil
 }
 
 // Copy pipes the output of srcCmd on src straight into dstCmd on dst, both as
 // user, calling progress with the running byte count.
 func Copy(ctx context.Context, src, dst Server, user, srcCmd, dstCmd string, progress func(int64)) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	var srcErr, dstErr bytes.Buffer
 	from := src.command(ctx, user, nil, srcCmd)
 	from.Stderr = &srcErr
@@ -142,12 +159,17 @@ func Copy(ctx context.Context, src, dst Server, user, srcCmd, dstCmd string, pro
 	}
 	_, copyErr := io.Copy(in, &countingReader{r: out, progress: progress})
 	in.Close() // end of input for dstCmd
-	fromErr, toErr := from.Wait(), to.Wait()
+	if copyErr != nil {
+		cancel() // the destination stopped reading; stop the source rather than let it block forever
+	}
+	toErr, fromErr := to.Wait(), from.Wait()
 	switch {
-	case fromErr != nil:
-		return fmt.Errorf("read from %s: %w: %s", src.Host, fromErr, strings.TrimSpace(srcErr.String()))
+	case fromErr != nil && copyErr == nil: // the source failed on its own
+		return fmt.Errorf("read from %s: %w", src.Host, withStderr(fromErr, &srcErr))
 	case toErr != nil:
-		return fmt.Errorf("write to %s: %w: %s", dst.Host, toErr, strings.TrimSpace(dstErr.String()))
+		return fmt.Errorf("write to %s: %w", dst.Host, withStderr(toErr, &dstErr))
+	case fromErr != nil:
+		return fmt.Errorf("read from %s: %w", src.Host, withStderr(fromErr, &srcErr))
 	}
 	return copyErr
 }

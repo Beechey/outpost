@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"os/exec"
 	"testing"
+
+	"github.com/Beechey/outpost/internal/remote"
 )
 
 func TestValidateServer(t *testing.T) {
@@ -34,6 +36,15 @@ func TestValidateServer(t *testing.T) {
 func TestMoveRejectsSameServer(t *testing.T) {
 	if err := Move(t.Context(), MoveOptions{Old: "1.2.3.4", New: "1.2.3.4"}); err == nil {
 		t.Error("Move to the same server should fail")
+	}
+}
+
+func TestServerID(t *testing.T) {
+	if got := serverID(remote.Server{Host: "box"}); got != "box" {
+		t.Errorf("default port: got %q", got)
+	}
+	if got := serverID(remote.Server{Host: "box", Port: 2222}); got != "box:2222" {
+		t.Errorf("custom port: got %q", got)
 	}
 }
 

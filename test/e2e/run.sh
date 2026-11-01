@@ -14,7 +14,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 ROOT=../.. OLD=2297 NEW=2298 BIN="$(mktemp -d)/outpost"
 ssh_to() { ssh -p "$1" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR "$2@localhost" "${@:3}"; }
-check() { if eval "$2"; then echo "  ok: $1"; else echo "  FAIL: $1"; exit 1; fi; }
+check() { if eval "$2"; then echo "  ok: $1"; else echo "  FAIL: $1"; return 1; fi; }
 
 cleanup() { docker rm -f -v outpost-e2e-old outpost-e2e-new >/dev/null 2>&1 || true; }
 trap cleanup EXIT
@@ -82,12 +82,16 @@ check "Docker works" 'on_new "docker run --rm hello-world" >/dev/null 2>&1'
 
 echo "--- the old server is retired, with its files intact"
 check "T3 service removed" '[ "$(ssh_to $OLD dev "systemctl --user is-enabled t3code.service 2>/dev/null")" != enabled ]'
-check "records where it moved" '[ "$(ssh_to $OLD dev "cat ~/.t3/moved-to")" = localhost ]'
+check "records where it moved" '[ "$(ssh_to $OLD dev "cat ~/.t3/moved-to")" = localhost:$NEW ]'
 check "files untouched" 'ssh_to $OLD dev "cat ~/code/Hello-World/notes.txt" | grep -q wip'
+"$BIN" setup -p $OLD localhost </dev/null > /tmp/outpost-e2e-revive.log 2>&1 || true
+check "setup refuses to revive it" 'grep -q retired /tmp/outpost-e2e-revive.log && ! grep -q Installing /tmp/outpost-e2e-revive.log' ||
+  { cat /tmp/outpost-e2e-revive.log; exit 1; }
 
 echo "--- re-running the move is safe"
 "$BIN" move localhost localhost --old-port $OLD --new-port $NEW --yes </dev/null > /tmp/outpost-e2e-rerun.log 2>&1
 check "skips the copy" 'grep -q "Already moved" /tmp/outpost-e2e-rerun.log'
+check "doesn't reboot a server in use" 'grep -q "Health check" /tmp/outpost-e2e-rerun.log && ! grep -q "Rebooting" /tmp/outpost-e2e-rerun.log'
 check "still the same environment" '[ "$(on_new "cat ~/.t3/userdata/environment-id")" = "$OLD_ENV" ]'
 
 echo "PASS"

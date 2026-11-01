@@ -79,7 +79,7 @@ func Move(ctx context.Context, o MoveOptions) error {
 	if err != nil {
 		return err
 	}
-	alreadyMoved := sv.movedTo == o.New
+	alreadyMoved := sv.movedTo == serverID(srv)
 	if sv.movedTo != "" && !alreadyMoved {
 		return fmt.Errorf("%s was already moved to %s. Move from that server instead", o.Old, sv.movedTo)
 	}
@@ -89,7 +89,7 @@ func Move(ctx context.Context, o MoveOptions) error {
 	printSurvey(sv, alreadyMoved)
 
 	st.next("Connecting to " + o.New)
-	admin, _, err := connect(ctx, srv)
+	admin, inUse, err := connect(ctx, srv)
 	if err != nil {
 		return err
 	}
@@ -106,7 +106,7 @@ func Move(ctx context.Context, o MoveOptions) error {
 
 	st.next("Moving your work")
 	if alreadyMoved {
-		lipgloss.Println("  " + ui.Accent.Render("✓") + " Already moved " + ui.Muted.Render("finishing the remaining steps"))
+		ui.Check("Already moved", "finishing the remaining steps")
 	} else if err := transfer(ctx, old, srv, sv); err != nil {
 		return err
 	}
@@ -115,7 +115,8 @@ func Move(ctx context.Context, o MoveOptions) error {
 	if err := runLogins(ctx, srv); err != nil {
 		return err
 	}
-	if err := finalCheck(ctx, srv, st, false); err != nil {
+	// A first move reboots to prove the new server starts by itself; a re-run may find agents at work there.
+	if err := finalCheck(ctx, srv, st, alreadyMoved && inUse); err != nil {
 		return err
 	}
 
@@ -196,10 +197,19 @@ func confirmMove(ctx context.Context, o MoveOptions) error {
 	return nil
 }
 
-// transfer stops T3 on the old server, copies everything across, and retires
+// serverID names a server in the old server's moved-to record, so a host
+// with several SSH ports isn't mistaken for one server.
+func serverID(s remote.Server) string {
+	if s.Port == 0 {
+		return s.Host
+	}
+	return fmt.Sprintf("%s:%d", s.Host, s.Port)
+}
+
+// transfer stops T3 on the old server, copies everything to dst, and retires
 // the old server's T3 so only one machine answers as this environment. If the
 // copy fails, T3 starts again on the old server.
-func transfer(ctx context.Context, old, srv remote.Server, sv survey) (err error) {
+func transfer(ctx context.Context, old, dst remote.Server, sv survey) (err error) {
 	p := ui.NewProgress()
 	defer func() { p.Done(err) }()
 
@@ -207,13 +217,20 @@ func transfer(ctx context.Context, old, srv remote.Server, sv survey) (err error
 	if _, err := old.Output(ctx, DevUser, "systemctl --user stop t3code.service 2>/dev/null; true"); err != nil {
 		return fmt.Errorf("stop T3 on %s: %w", old.Host, err)
 	}
-	restartOld := func() { _, _ = old.Output(ctx, DevUser, "systemctl --user start t3code.service") }
+	// undo restarts T3 on the old server after a failure, even if the run was cancelled with Ctrl-C.
+	undo := func(cause error) error {
+		if _, err := old.Output(context.WithoutCancel(ctx), DevUser, "systemctl --user start t3code.service"); err != nil {
+			return fmt.Errorf("%w. T3 on %s is still stopped; start it with: ssh dev@%s systemctl --user start t3code.service",
+				cause, old.Host, old.Host)
+		}
+		return fmt.Errorf("%w. T3 is running on %s again, so nothing is lost", cause, old.Host)
+	}
 
-	p.Task("Clearing T3 data on " + srv.Host)
-	if _, err := srv.Output(ctx, DevUser,
-		"systemctl --user stop t3code.service 2>/dev/null; rm -rf ~/.t3/userdata ~/.t3/worktrees"); err != nil {
-		restartOld()
-		return fmt.Errorf("prepare %s: %w", srv.Host, err)
+	p.Task("Clearing T3 data on " + dst.Host)
+	// moved-to too: dst may itself have been moved from before, and is now the live server.
+	if _, err := dst.Output(ctx, DevUser,
+		"systemctl --user stop t3code.service 2>/dev/null; rm -rf ~/.t3/userdata ~/.t3/worktrees ~/.t3/moved-to"); err != nil {
+		return undo(fmt.Errorf("prepare %s: %w", dst.Host, err))
 	}
 
 	label := "Copying " + sv.size
@@ -222,24 +239,26 @@ func transfer(ctx context.Context, old, srv remote.Server, sv survey) (err error
 	for _, e := range moveExcludes {
 		excludes = append(excludes, "--exclude='"+e+"'")
 	}
-	src := "cd ~ && tar -cz " + strings.Join(excludes, " ") + " " + strings.Join(sv.paths, " ")
-	err = remote.Copy(ctx, old, srv, DevUser, src, "tar -xz -C ~", func(n int64) {
+	// tar exits 1 when a file changes while it's read (an agent's container still writing,
+	// say). That file is copied as it was, which is fine; only exit 2 is a real failure.
+	src := "cd ~ || exit 2; tar -cz --warning=no-file-changed " + strings.Join(excludes, " ") + " " +
+		strings.Join(sv.paths, " ") + "; [ $? -le 1 ]"
+	err = remote.Copy(ctx, old, dst, DevUser, src, "tar -xz -C ~", func(n int64) {
 		p.Update(label + " " + ui.Muted.Render(humanize.Bytes(uint64(n))+" sent"))
 	})
 	if err != nil {
-		restartOld()
-		return fmt.Errorf("copy failed, so T3 was restarted on %s and nothing is lost: %w", old.Host, err)
+		return undo(fmt.Errorf("copy failed: %w", err))
 	}
 
 	p.Task("Retiring T3 on " + old.Host)
 	// Keep the data, but don't let T3 start there again, and remember where it went.
 	if _, err := old.Output(ctx, DevUser,
-		`export PATH="$HOME/.local/bin:$PATH"; t3 service uninstall >/dev/null 2>&1; echo `+srv.Host+` > ~/.t3/moved-to`); err != nil {
+		userPath+`t3 service uninstall >/dev/null 2>&1; echo '`+serverID(dst)+`' > ~/.t3/moved-to`); err != nil {
 		return fmt.Errorf("retire T3 on %s: %w", old.Host, err)
 	}
 
-	p.Task("Starting T3 on " + srv.Host)
+	p.Task("Starting T3 on " + dst.Host)
 	// Only matters on a re-run, where the new server already had the service; otherwise the T3 Connect login installs it.
-	_, _ = srv.Output(ctx, DevUser, "systemctl --user start t3code.service 2>/dev/null; true")
+	_, _ = dst.Output(ctx, DevUser, "systemctl --user start t3code.service 2>/dev/null; true")
 	return nil
 }

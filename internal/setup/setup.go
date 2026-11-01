@@ -64,6 +64,11 @@ func Run(ctx context.Context, o Options) error {
 	if err != nil {
 		return err
 	}
+	if movedTo := movedTo(ctx, srv, admin); movedTo != "" {
+		// Setting it up again would bring back a second machine answering as the same T3 environment.
+		return fmt.Errorf("this server's work was moved to %s with outpost move, so it's retired. "+
+			"Set up %s instead, or to reuse this server, delete ~/.t3/moved-to on it first", movedTo, movedTo)
+	}
 	st.next("Installing (3-5 minutes)")
 	if err := install(ctx, srv, admin); err != nil {
 		return err
@@ -98,8 +103,17 @@ func connect(ctx context.Context, srv remote.Server) (admin string, inUse bool, 
 		return "", false, err
 	}
 	lipgloss.Println("  " + ui.Muted.Render("Logged in as "+admin))
-	inUse = admin == DevUser && srvOK(ctx, srv, "t3 status --json | jq -e .service.installed")
+	inUse = admin == DevUser && devCheck(ctx, srv, "t3 status --json | jq -e .service.installed")
 	return admin, inUse, nil
+}
+
+// movedTo reports where a server's work was moved, if it was retired by outpost move.
+func movedTo(ctx context.Context, srv remote.Server, admin string) string {
+	if admin != DevUser { // a fresh server: nothing has run there yet
+		return ""
+	}
+	out, _ := srv.Output(ctx, DevUser, "cat ~/.t3/moved-to 2>/dev/null")
+	return strings.TrimSpace(string(out))
 }
 
 func install(ctx context.Context, srv remote.Server, admin string) error {
@@ -158,15 +172,19 @@ func adminUser(ctx context.Context, srv remote.Server) (string, error) {
 		return "root", nil
 	}
 	fmt.Println("  Your SSH key isn't on the server yet. Enter the root password from your provider:")
-	if err := srv.CopyID(ctx, "root"); err != nil || !srv.CanLogin(ctx, "root") {
-		return "", fmt.Errorf("can't log in as root: check the address and password. "+
-			"If you reinstalled the server, first run: ssh-keygen -R %s", srv.Host)
+	if err := srv.CopyID(ctx, "root"); err != nil {
+		return "", fmt.Errorf("can't log in as root (%w). Check the address and password. "+
+			"If you reinstalled the server, first run: ssh-keygen -R %s", err, srv.Host)
+	}
+	if !srv.CanLogin(ctx, "root") {
+		return "", errors.New("your key was copied, but logging in as root with it still fails. " +
+			"The server may not allow root login with a key (PermitRootLogin)")
 	}
 	return "root", nil
 }
 
-// srvOK reports whether a check run as the dev user succeeds.
-func srvOK(ctx context.Context, srv remote.Server, check string) bool {
+// devCheck reports whether a shell check, run as the dev user with its tools on PATH, succeeds.
+func devCheck(ctx context.Context, srv remote.Server, check string) bool {
 	_, err := srv.Output(ctx, DevUser, userPath+check)
 	return err == nil
 }
@@ -246,16 +264,22 @@ func sleep(ctx context.Context, d time.Duration) error {
 	}
 }
 
+// ensureKey makes sure there's an SSH key to log in with: an existing key file,
+// a key in the SSH agent, or a new one.
 func ensureKey(ctx context.Context) error {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return err
 	}
-	key := filepath.Join(home, ".ssh", "id_ed25519")
-	if _, err := os.Stat(key + ".pub"); err == nil {
-		lipgloss.Println("  " + ui.Muted.Render("Using "+key+".pub"))
+	if keys, _ := filepath.Glob(filepath.Join(home, ".ssh", "id_*.pub")); len(keys) > 0 {
+		lipgloss.Println("  " + ui.Muted.Render("Using "+keys[0]))
 		return nil
 	}
+	if exec.CommandContext(ctx, "ssh-add", "-L").Run() == nil {
+		lipgloss.Println("  " + ui.Muted.Render("Using the keys in your SSH agent"))
+		return nil
+	}
+	key := filepath.Join(home, ".ssh", "id_ed25519")
 	fmt.Println("  No SSH key yet, creating one. Press Enter at each question.")
 	gen := exec.CommandContext(ctx, "ssh-keygen", "-t", "ed25519", "-f", key)
 	gen.Stdin, gen.Stdout, gen.Stderr = os.Stdin, os.Stdout, os.Stderr

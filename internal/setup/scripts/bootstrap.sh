@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Turns a fresh Ubuntu 24.04 machine into a T3 Code agent box. Safe to re-run.
-# Run for you by `outpost setup`, which shows each "::task" line as a progress step.
-# Logins and repos happen afterwards in login.sh and repos.sh.
+# Run for you by `outpost setup` and `outpost move`, which show each "::task" line as a
+# progress step. Logins happen afterwards, from the CLI.
 set -euo pipefail
 task() { echo "::task $*"; }
 # Retry downloads: a flaky connection shouldn't fail the whole install.
 fetch() { curl -fsSL --retry 5 --retry-delay 2 --retry-all-errors "$@"; }
 
-DEV_USER="${DEV_USER:-dev}"
+DEV_USER=dev # must match DevUser in internal/setup/setup.go
 [ "$(id -u)" -eq 0 ] || { echo "Run as root (sudo bash bootstrap.sh)"; exit 1; }
 export DEBIAN_FRONTEND=noninteractive
 
@@ -47,8 +47,11 @@ if ! id "$DEV_USER" >/dev/null 2>&1; then
 fi
 usermod -aG docker "$DEV_USER"
 # Passwordless sudo: dev already controls the box via the docker group, so a password adds friction, not safety.
-echo "$DEV_USER ALL=(ALL) NOPASSWD:ALL" > /tmp/outpost-sudoers
-visudo -cf /tmp/outpost-sudoers && install -m 440 /tmp/outpost-sudoers /etc/sudoers.d/outpost
+sudoers="$(mktemp)"
+echo "$DEV_USER ALL=(ALL) NOPASSWD:ALL" > "$sudoers"
+visudo -cf "$sudoers" >/dev/null || { echo "outpost: sudoers rule failed validation" >&2; exit 1; }
+install -m 440 "$sudoers" /etc/sudoers.d/outpost
+rm -f "$sudoers"
 loginctl enable-linger "$DEV_USER" # keeps T3's user service running after logout
 HOME_DIR="$(getent passwd "$DEV_USER" | cut -d: -f6)"
 
