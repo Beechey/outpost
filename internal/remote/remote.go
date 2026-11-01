@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -58,7 +59,9 @@ func (s Server) RunScript(ctx context.Context, user string, script []byte, runne
 	if err := upload.Run(); err != nil {
 		return fmt.Errorf("upload script: %w", err)
 	}
-	return attach(s.command(ctx, user, []string{"-t"}, append([]string{runner, path}, args...)...)).Run()
+	run := strings.Join(append([]string{runner, path}, args...), " ")
+	// Clean up the script but keep its exit status.
+	return attach(s.command(ctx, user, []string{"-t"}, run+"; s=$?; rm -f "+path+"; exit $s")).Run()
 }
 
 func attach(cmd *exec.Cmd) *exec.Cmd {

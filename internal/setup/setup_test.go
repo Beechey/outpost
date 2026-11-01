@@ -31,7 +31,7 @@ func TestValidate(t *testing.T) {
 }
 
 func TestScriptsParse(t *testing.T) {
-	for name, script := range map[string][]byte{"bootstrap.sh": bootstrapScript, "finish.sh": finishScript} {
+	for name, script := range map[string][]byte{"bootstrap.sh": bootstrapScript, "login.sh": loginScript, "repos.sh": reposScript} {
 		cmd := exec.CommandContext(t.Context(), "bash", "-n")
 		cmd.Stdin = bytes.NewReader(script)
 		if out, err := cmd.CombinedOutput(); err != nil {

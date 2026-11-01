@@ -17,14 +17,18 @@ import (
 	"github.com/Beechey/outpost/internal/remote"
 )
 
+const totalSteps = 6
+
 // DevUser runs T3 Code and the agents. It must match DEV_USER in bootstrap.sh.
 const DevUser = "dev"
 
 var (
 	//go:embed scripts/bootstrap.sh
 	bootstrapScript []byte
-	//go:embed scripts/finish.sh
-	finishScript []byte
+	//go:embed scripts/login.sh
+	loginScript []byte
+	//go:embed scripts/repos.sh
+	reposScript []byte
 
 	// No leading "-", so a host can't be read as an ssh option.
 	hostRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9.:-]*$`)
@@ -80,12 +84,17 @@ func Run(ctx context.Context, o Options) error {
 		return fmt.Errorf("server install failed, see the output above: %w", err)
 	}
 
-	step(4, "Logins and repos: approve each link on your laptop")
-	if err := srv.RunScript(ctx, DevUser, finishScript, "bash", o.Repos...); err != nil {
-		return fmt.Errorf("finishing failed, see the output above, then run the same command again: %w", err)
+	step(4, "Logins: approve each link on your laptop")
+	if err := srv.RunScript(ctx, DevUser, loginScript, "bash"); err != nil {
+		return fmt.Errorf("a login failed, see the output above, then run the same command again: %w", err)
 	}
 
-	step(5, "Rebooting to check everything comes back by itself")
+	step(5, "Cloning your repos into T3")
+	if err := srv.RunScript(ctx, DevUser, reposScript, "bash", o.Repos...); err != nil {
+		return fmt.Errorf("repo setup failed, see the output above: %w", err)
+	}
+
+	step(6, "Rebooting to check everything comes back by itself")
 	if err := rebootCheck(ctx, srv); err != nil {
 		return err
 	}
@@ -94,7 +103,7 @@ func Run(ctx context.Context, o Options) error {
 }
 
 func step(n int, msg string) {
-	fmt.Println(stepStyle.Render(fmt.Sprintf("\n[%d/5] %s", n, msg)))
+	fmt.Println(stepStyle.Render(fmt.Sprintf("\n[%d/%d] %s", n, totalSteps, msg)))
 }
 
 // adminUser picks who runs the install: root on a fresh server, or dev on a
