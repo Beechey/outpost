@@ -8,6 +8,7 @@ Everything about using outpost, in the order you'll need it: set a server up, li
   - [Choose how your devices connect](#choose-how-your-devices-connect)
   - [Sign in again](#sign-in-again)
   - [Change swap](#change-swap)
+  - [Rename it](#rename-it)
   - [Update it](#update-it)
   - [Back it up](#back-it-up)
   - [Working with it day to day](#working-with-it-day-to-day)
@@ -49,6 +50,8 @@ outpost setup SERVER_IP
 
 **Swap.** First it shows the server's memory and free disk and asks how many GB to use as swap: disk the server uses as backup memory, so when agents fill the memory it slows down instead of stopping programs. About as much as the server's memory is plenty; enter `0` for none. outpost always leaves 10 GB of disk free. You can [change it later](#change-swap).
 
+**Name.** A fresh server is asked what to call it. T3 Code and Tailscale show this name, and T3 Connect keeps the name it sees first, so outpost sets it before signing in. Leave it empty to keep the provider's name.
+
 **Install.** Then it installs everything, which takes 3–5 minutes.
 
 **Logins.** Each shows a link or code: open it on your laptop and approve.
@@ -58,8 +61,8 @@ outpost setup SERVER_IP
 | Root password | Only if your SSH key isn't on the server yet. Typed once. |
 | **Tailscale** | Open the link and sign in with the **same account as your laptop**. |
 | **Claude** | Open the link, approve, and paste the code back into the terminal. |
-| **GitHub** | Answer **Yes** to "Authenticate Git", then open <https://github.com/login/device> and enter the code shown. |
-| **T3 Connect** | Open the link, check the code matches, and approve. With Tailscale access, you scan a pairing QR code instead. |
+| **GitHub** | Open the link shown (<https://github.com/login/device>) and enter the code. |
+| **T3 Connect** | Open the link, check the code matches, and approve. With Tailscale access, outpost pairs instead: it adds the server to T3 Code on this computer, or shows a QR code for another device. |
 
 **Reboot check.** Finally it reboots the server to prove everything comes back by itself. When you see **All set**:
 
@@ -75,6 +78,7 @@ If anything fails, run the same command again. Finished steps are skipped, and a
 | Flag | Does |
 |---|---|
 | `--swap 4` | Adds 4 GB of swap without asking. `--swap 0` adds none. |
+| `--name tars` | Names the server `tars` without asking. |
 | `--tailscale` | Serves T3 on your tailnet only, instead of T3 Connect. |
 | `--connect` | Uses T3 Connect, the default for a new server. |
 </details>
@@ -110,7 +114,7 @@ It shows memory, swap and disk, how devices reach T3, whether everything is runn
 | Phone notifications and Live Activities | Yes | No: T3 delivers these only through T3 Connect |
 | Traffic goes | Through T3 Connect's relay | Directly between your devices, encrypted by Tailscale |
 | Cost | Free for 3 machines; [T3 Chat](https://t3.chat) Pro raises it to 10, Premier to 100 | Free, unlimited |
-| Adding a device | Sign in to T3 Connect on it | `outpost pair SERVER`, then scan the QR code |
+| Adding a device | Sign in to T3 Connect on it | `outpost pair SERVER`: it adds this computer, or shows a QR code for another device |
 
 ```bash
 outpost access SERVER_IP tailscale   # serve T3 on your tailnet only
@@ -119,7 +123,7 @@ outpost access SERVER_IP             # see the current choice, then pick
 outpost pair SERVER_IP               # pair another device, such as your phone
 ```
 
-Switching signs in to the new way and turns the old one off, without reinstalling or rebooting. To be sure a server that leaves T3 Connect frees its machine slot, deregister it in T3 Code, under the account menu → **T3 Connect**. Pairing links work for 5 minutes; a paired device stays paired.
+Switching signs in to the new way and turns the old one off, without reinstalling or rebooting. To be sure a server that leaves T3 Connect frees its machine slot, deregister it in T3 Code, under the account menu → **T3 Connect**. Each pairing code works once, for 5 minutes; a paired device stays paired.
 
 **Which to pick:** T3 Connect for the servers you check from your phone, since only T3 Connect gives push notifications. Tailscale for extra servers beyond your T3 Connect limit, or if you'd rather traffic didn't go through a relay.
 
@@ -145,6 +149,14 @@ outpost swap SERVER_IP 0             # remove it
 ```
 
 No reboot needed, and outpost still leaves 10 GB of disk free. Shrinking or removing swap moves what's in it back into memory, so it can fail while agents are using most of the memory; try again when they're quieter. outpost only changes its own swap file, never a swap partition from your provider.
+
+### Rename it
+
+```sh
+outpost rename SERVER_IP tars
+```
+
+Sets the server's name, keeps it across reboots, and renames it in Tailscale too, so it's reachable at `tars.YOUR-TAILNET.ts.net`. T3 Connect may keep showing the name it saw first; naming the server during setup avoids that.
 
 ### Update it
 
@@ -217,7 +229,7 @@ Switching providers, upgrading, or moving from a VPS to a box at home:
 outpost move OLD_SERVER_IP NEW_SERVER_IP
 ```
 
-Or run plain `outpost move` and pick both from a list. It checks the old server, asks you to confirm, sets up the new one (asking about swap, as setup does), moves everything across, and signs the new one in. The new server takes over as **the same environment in T3 Code**, so your threads continue where they left off. `--tailscale`, `--connect` and `--swap` work as they do for setup, and `--yes` asks nothing at all.
+Or run plain `outpost move` and pick both from a list. It checks the old server, asks you to confirm, sets up the new one (asking about its name and swap, as setup does), moves everything across, and signs the new one in. The new server takes over as **the same environment in T3 Code**, so your threads continue where they left off. `--tailscale`, `--connect`, `--swap` and `--name` work as they do for setup, and `--yes` asks nothing at all.
 
 | Moves | Doesn't move |
 |---|---|

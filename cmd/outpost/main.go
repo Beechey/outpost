@@ -39,13 +39,13 @@ func rootCmd() *cobra.Command {
 			"Leave one out to pick from the servers outpost has set up before.",
 		SilenceUsage: true,
 	}
-	root.AddCommand(setupCmd(), statusCmd(), accessCmd(), pairCmd(), loginCmd(), swapCmd(), updateCmd(), backupCmd(), moveCmd(), listCmd(), forgetCmd(), upgradeCmd())
+	root.AddCommand(setupCmd(), statusCmd(), accessCmd(), pairCmd(), loginCmd(), swapCmd(), renameCmd(), updateCmd(), backupCmd(), moveCmd(), listCmd(), forgetCmd(), upgradeCmd())
 	return root
 }
 
 func setupCmd() *cobra.Command {
 	var access accessFlags
-	var swap string
+	var swap, name string
 	cmd := &cobra.Command{
 		Use:   "setup [server]",
 		Short: "Prepare a fresh Ubuntu 24.04 server, or repair an existing one",
@@ -54,10 +54,12 @@ func setupCmd() *cobra.Command {
 			"reboots it to prove everything comes back by itself.\n\n" +
 			"Safe to re-run: finished steps are skipped, and a server already in use gets a\n" +
 			"health check instead of a reboot.\n\n" +
-			"A server without swap gets the choice of adding some; --swap answers for you.",
+			"A server without swap gets the choice of adding some; --swap answers for you.\n" +
+			"A fresh server is asked for a name, shown in T3 Code; --name answers for you.",
 		Example: "  outpost setup 203.0.113.7\n" +
 			"  outpost setup 203.0.113.7 --tailscale    # tailnet only, no T3 Connect slot\n" +
 			"  outpost setup 203.0.113.7 --swap 4       # add 4 GB of swap without asking\n" +
+			"  outpost setup 203.0.113.7 --name tars    # name it tars without asking\n" +
 			"  outpost setup my-home-server.local:2222\n" +
 			"  outpost setup                            # pick a server you've set up before",
 		Args: cobra.MaximumNArgs(1),
@@ -66,7 +68,7 @@ func setupCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := setup.Setup(cmd.Context(), srv, access.value(), swap); err != nil {
+			if err := setup.Setup(cmd.Context(), srv, access.value(), swap, name); err != nil {
 				return err
 			}
 			_ = servers.Remember(srv) // only for the list next time
@@ -75,13 +77,14 @@ func setupCmd() *cobra.Command {
 	}
 	access.add(cmd)
 	addSwapFlag(cmd, &swap)
+	addNameFlag(cmd, &name)
 	return cmd
 }
 
 func moveCmd() *cobra.Command {
 	var yes bool
 	var access accessFlags
-	var swap string
+	var swap, name string
 	cmd := &cobra.Command{
 		Use:   "move [old-server] [new-server]",
 		Short: "Move everything to a new server: code, T3 threads, agent history",
@@ -103,7 +106,7 @@ func moveCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := setup.Move(cmd.Context(), old, dst, yes, access.value(), swap); err != nil {
+			if err := setup.Move(cmd.Context(), old, dst, yes, access.value(), swap, name); err != nil {
 				return err
 			}
 			_ = servers.Forget(old) // only for the list next time
@@ -111,9 +114,10 @@ func moveCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "don't ask anything: confirm the move, and add swap only with --swap")
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "don't ask anything: confirm the move, add swap only with --swap, and rename only with --name")
 	access.add(cmd)
 	addSwapFlag(cmd, &swap)
+	addNameFlag(cmd, &name)
 	return cmd
 }
 
@@ -169,6 +173,24 @@ func swapCmd() *cobra.Command {
 				size = args[1]
 			}
 			return setup.Swap(cmd.Context(), srv, size)
+		},
+	}
+}
+
+func renameCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "rename SERVER NAME",
+		Short: "Rename a server, in Tailscale too",
+		Long: "Sets the server's hostname, keeps it across reboots, and renames it in Tailscale.\n" +
+			"Use lowercase letters, numbers and hyphens.",
+		Example: "  outpost rename 203.0.113.7 tars",
+		Args:    cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			srv, err := servers.Parse(args[0])
+			if err != nil {
+				return err
+			}
+			return setup.Rename(cmd.Context(), srv, args[1])
 		},
 	}
 }
@@ -267,10 +289,11 @@ func updateCmd() *cobra.Command {
 func pairCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "pair [server]",
-		Short: "Pair another device with a server that uses Tailscale",
-		Long: "Prints a QR code and link that pair T3 Code on another device, such as your\n" +
-			"phone, with a server set up with --tailscale. The device needs Tailscale too.\n" +
-			"The link works for 5 minutes.",
+		Short: "Pair a device with a server that uses Tailscale",
+		Long: "Pairs T3 Code with a server set up with --tailscale. It asks which device:\n" +
+			"this computer, where it opens T3 Code to add the server, or another device,\n" +
+			"such as your phone, where you scan a QR code. The device needs Tailscale too.\n" +
+			"Each pairing code works once, for 5 minutes.",
 		Example: "  outpost pair 203.0.113.7",
 		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -448,6 +471,10 @@ func (a *accessFlags) value() setup.Access {
 }
 
 // addSwapFlag adds --swap: how many GB of swap to add without asking.
+func addNameFlag(cmd *cobra.Command, name *string) {
+	cmd.Flags().StringVar(name, "name", "", "rename the server to this without asking (shown in T3 Code)")
+}
+
 func addSwapFlag(cmd *cobra.Command, swap *string) {
 	cmd.Flags().StringVar(swap, "swap", "", "add this many GB of swap without asking (0 for none)")
 }

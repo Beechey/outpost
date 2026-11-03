@@ -185,7 +185,7 @@ The new server becomes the same environment in T3 Code, so threads continue wher
 | `outpost setup SERVER` | Prepare a fresh server, or repair one. Safe to re-run. |
 | `outpost status SERVER` | See how a server is set up and what needs fixing. Changes nothing. |
 | `outpost access SERVER [connect\|tailscale]` | Switch how your devices reach T3. |
-| `outpost pair SERVER` | Pair another device, such as your phone, with a Tailscale server. |
+| `outpost pair SERVER` | Pair this computer, or another device such as your phone, with a Tailscale server. |
 | `outpost login SERVER [ACCOUNT]` | Sign in again: `tailscale`, `claude`, `github` or `t3`, or whatever is missing. |
 | `outpost swap SERVER [GB]` | Change how much swap a server has. `0` removes it. |
 | `outpost update SERVER` | Update T3 Code, Claude Code and system packages. |

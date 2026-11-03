@@ -58,7 +58,7 @@ Each command after setup logs in as `dev`, so it needs a server outpost set up. 
 | Command | On the server |
 |---|---|
 | `status` | Reads memory, swap and disk from `/proc/meminfo` and `df`, `t3 status --json` for access, `systemctl is-active` for the services, each login's own status check, and `/var/run/reboot-required`. Changes nothing. |
-| `access` | Runs `t3 up --connect --no-lan` or `t3 up --lan --no-connect` (then `t3 pair --tailscale`), which turns the new way on and the old one off. No reinstall, no reboot. |
+| `access` | Runs `t3 up --connect --no-lan` or `t3 up --lan --no-connect` (then `t3 pair --tailscale`, whose `t3code://` link outpost opens here, or whose QR code it shows for another device), which turns the new way on and the old one off. No reinstall, no reboot. |
 | `login` | Runs the same sign-in as setup for the named account, even if its status check passes, since a login can look valid after it has expired. With no account, signs in to each one whose check fails. |
 | `swap` | As root: turns `/swapfile` off, removes it and its `/etc/fstab` line, then makes, turns on and records one of the new size. Swap from elsewhere, such as a provider's partition, is left alone. Free disk counts the space the old file gives back, and 10 GB always stays free. |
 | `update` | `t3 update --yes`, which restarts T3 on the new version; `claude update`; then `apt-get update` and `upgrade`, keeping config files you changed. |
