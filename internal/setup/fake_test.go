@@ -152,6 +152,10 @@ func (s *scripted) Input(_ context.Context, title, _, _ string, validate func(st
 	return a, err
 }
 
+func (s *scripted) Secret(_ context.Context, title, _ string) (string, error) {
+	return s.next(title)
+}
+
 // answer makes the user give these answers, in order, for the rest of the test.
 func answer(t *testing.T, answers ...string) *scripted {
 	t.Helper()
@@ -175,7 +179,7 @@ func testEnv(t *testing.T) context.Context {
 	saved := ui.Ask
 	ui.Ask = &scripted{}
 	t.Cleanup(func() { ui.Ask = saved })
-	for _, d := range []*time.Duration{&rebootSettle, &pollInterval} {
+	for _, d := range []*time.Duration{&rebootSettle, &pollInterval, &featuresTimeout} {
 		old := *d
 		*d = time.Millisecond
 		t.Cleanup(func() { *d = old })

@@ -136,20 +136,28 @@ It asks how much swap you want, installs everything, then walks you through the 
 
 ## Living with it
 
-Check on a server any time. `status` only looks, and names the command that changes or fixes each part:
+Run `outpost` on its own for a menu: pick a server, see its status, and change any part of it. Or check on a server directly. `status` only looks, and names the command that fixes each problem:
 
 ```bash
 outpost status 203.0.113.7
 ```
 
 ```
-203.0.113.7
-  • Memory 8 GB, 4 GB of swap, 52 GB of disk free  outpost swap 203.0.113.7
-  • Access T3 Connect  outpost access 203.0.113.7
-  ✓ T3 Code, Docker and Tailscale running
-  ✓ Tailscale signed in
-  ✗ Claude not signed in. Fix: outpost login 203.0.113.7 claude
-  ✓ GitHub signed in
+╭───────────────────────────────────────────────────────────────╮
+│  ▲ devbox  1 thing to fix                                     │
+│                                                               │
+│  Access    T3 over Tailscale  https://devbox.tail1234.ts.net  │
+│  Gateway   Tailscale names, 2 projects                        │
+│  Memory    16 GB · 4 GB swap · 120 GB disk free               │
+│  Running   ✓ T3 Code  ✓ Docker  ✓ Tailscale  ✓ Gateway        │
+│  Logins    ✓ Tailscale  ✗ Claude  ✓ GitHub                    │
+╰───────────────────────────────────────────────────────────────╯
+
+  Projects
+    myapp               https://myapp-devbox.tail1234.ts.net
+    files.myapp         https://files-myapp-devbox.tail1234.ts.net
+
+  ✗ Claude not signed in. Fix: outpost login devbox claude
 ```
 
 Then change whatever you need, without setting the server up again:
@@ -160,7 +168,25 @@ outpost access 203.0.113.7 tailscale  # tailnet only, or back with: connect
 outpost login 203.0.113.7 claude      # a login expired
 outpost update 203.0.113.7            # T3 Code, Claude Code and system packages
 outpost backup 203.0.113.7            # a copy of your work on your laptop
+outpost gateway add 203.0.113.7 myapp 3000   # https://myapp-… for every device
 ```
+
+## HTTPS for your projects
+
+Browsers only allow some features (the clipboard, passkeys, `crypto.randomUUID`) over HTTPS, so a web app running on the server breaks when you open it from your laptop or phone over plain http. The gateway gives each project a private HTTPS address on your tailnet:
+
+```bash
+outpost gateway add devbox myapp 3000 --path /ws=3001 --name files.myapp=9000
+```
+
+| | **Tailscale names** (default) | **Your own domain** |
+|---|---|---|
+| Looks like | `https://myapp-devbox.tail1234.ts.net` | `https://myapp.devbox.test` |
+| Certificates | Real ones, from Tailscale | outpost's own, which can only vouch for your domain |
+| On each device | Nothing | Trust it once, from `http://devbox.test` (one tap on iPhone) |
+| On the server | Nothing extra | Caddy and CoreDNS |
+
+Setup asks whether you want it. outpost does the Tailscale admin steps (tagging the server, the policy additions, Services, split DNS) with an API key, or shows you each step and checks it. Moves carry the addresses and the certificate, so devices stay trusted. [More →](docs/guide.md#give-projects-https-addresses)
 
 ## Moving on
 
@@ -182,10 +208,16 @@ The new server becomes the same environment in T3 Code, so threads continue wher
 
 | Command | What it does |
 |---|---|
+| `outpost` | The menu: pick a server, see its status, change anything. |
 | `outpost setup SERVER` | Prepare a fresh server, or repair one. Safe to re-run. |
 | `outpost status SERVER` | See how a server is set up and what needs fixing. Changes nothing. |
+| `outpost address SERVER` | Where to reach T3 Code and each project. |
 | `outpost access SERVER [connect\|tailscale]` | Switch how your devices reach T3. |
 | `outpost pair SERVER` | Pair this computer, or another device such as your phone, with a Tailscale server. |
+| `outpost gateway SERVER [tailscale\|domain\|off]` | Choose, change or repair the HTTPS addresses projects get. |
+| `outpost gateway add SERVER PROJECT PORT` | Give a project an address; `--path /p=PORT` and `--name NAME=PORT` for more. |
+| `outpost gateway remove SERVER PROJECT` | Take a project's addresses away. |
+| `outpost gateway trust SERVER` | Trust a gateway's certificate on this computer (own domain only). |
 | `outpost login SERVER [ACCOUNT]` | Sign in again: `tailscale`, `claude`, `github` or `t3`, or whatever is missing. |
 | `outpost swap SERVER [GB]` | Change how much swap a server has. `0` removes it. |
 | `outpost update SERVER` | Update T3 Code, Claude Code and system packages. |
@@ -194,7 +226,7 @@ The new server becomes the same environment in T3 Code, so threads continue wher
 | `outpost list` / `outpost forget SERVER` | See the servers outpost remembers, or take one off the list. |
 | `outpost upgrade` | Upgrade outpost itself to the newest version. |
 
-Servers are an IP or hostname, with `:port` if SSH isn't on 22. Leave one out to pick from the servers you've set up. `setup` and `move` also take `--tailscale` or `--connect`, and `--swap GB`, to answer their questions in advance.
+Servers are an IP or hostname, with `:port` if SSH isn't on 22. Leave one out to pick from the servers you've set up. `setup` and `move` also take `--tailscale` or `--connect`, and `--swap GB`, to answer their questions in advance; `setup` takes `--gateway tailscale|domain|off` and `--domain`.
 
 ## T3 Connect or Tailscale
 

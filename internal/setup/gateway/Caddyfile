@@ -1,0 +1,47 @@
+# outpost's gateway: an HTTPS name under {$GATEWAY_DOMAIN} for each project.
+# Made by outpost, which rewrites it: each project's sites are in sites/,
+# changed with `outpost gateway add` and `remove`. Settings are in gateway.env.
+#
+# Caddy listens on loopback only. The gateway's Tailscale Service passes the
+# tailnet's ports 443 and 80 to it, so nothing here faces the internet.
+{
+	admin localhost:44319
+	https_port 44343
+	http_port 44380
+	default_bind 127.0.0.1
+	auto_https disable_redirects
+	local_certs
+	skip_install_trust
+	storage file_system data
+	pki {
+		# outpost's root, which can only sign names under the domain.
+		ca local {
+			name "outpost {$GATEWAY_DOMAIN}"
+			root {
+				cert pki/{$GATEWAY_DOMAIN}/root.crt
+				key pki/{$GATEWAY_DOMAIN}/root.key
+			}
+		}
+	}
+}
+
+# The page devices get the certificate from, over plain http.
+http://{$GATEWAY_DOMAIN} {
+	root * www
+	header /outpost.mobileconfig Content-Type application/x-apple-aspen-config
+	header /root.crt Content-Type application/x-x509-ca-cert
+	file_server
+}
+
+# The domain itself over HTTPS: the page above asks it whether this device
+# trusts the certificate yet (it only answers if so). Anything else goes to the page.
+{$GATEWAY_DOMAIN} {
+	handle /trusted {
+		respond 204
+	}
+	handle {
+		redir http://{$GATEWAY_DOMAIN}{uri}
+	}
+}
+
+import sites/*.caddy

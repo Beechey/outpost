@@ -78,7 +78,7 @@ If anything fails, run the same command again. Finished steps are skipped, and a
 | Flag | Does |
 |---|---|
 | `--swap 4` | Adds 4 GB of swap without asking. `--swap 0` adds none. |
-| `--name tars` | Names the server `tars` without asking. |
+| `--name devbox` | Names the server `devbox` without asking. |
 | `--tailscale` | Serves T3 on your tailnet only, instead of T3 Connect. |
 | `--connect` | Uses T3 Connect, the default for a new server. |
 </details>
@@ -89,21 +89,27 @@ Every choice setup makes has its own command, so you never need to set a server 
 
 ### Check on it
 
+Run `outpost` on its own for the menu: pick a server, see its status card, and choose what to change. Every choice there runs the same command you can type, which goes straight to it:
+
 ```bash
 outpost status SERVER_IP
 ```
 
 ```
-203.0.113.7
-  • Memory 8 GB, 4 GB of swap, 52 GB of disk free  outpost swap 203.0.113.7
-  • Access T3 Connect  outpost access 203.0.113.7
-  ✓ T3 Code, Docker and Tailscale running
-  ✓ Tailscale signed in
-  ✗ Claude not signed in. Fix: outpost login 203.0.113.7 claude
-  ✓ GitHub signed in
+╭───────────────────────────────────────────────────────────────╮
+│  ▲ devbox  1 thing to fix                                     │
+│                                                               │
+│  Access    T3 Connect                                         │
+│  Gateway   off                                                │
+│  Memory    8 GB · 4 GB swap · 52 GB disk free                 │
+│  Running   ✓ T3 Code  ✓ Docker  ✓ Tailscale                   │
+│  Logins    ✓ Tailscale  ✗ Claude  ✓ GitHub                    │
+╰───────────────────────────────────────────────────────────────╯
+
+  ✗ Claude not signed in. Fix: outpost login devbox claude
 ```
 
-It shows memory, swap and disk, how devices reach T3, whether everything is running, and each sign-in, with the command that changes or fixes each line. It only looks; nothing on the server changes. It also tells you when installed updates are waiting for a reboot.
+It shows how devices reach T3, your projects' addresses, memory, swap and disk, whether everything is running, and each sign-in, with the command that fixes each problem. `outpost address SERVER_IP` prints just the addresses. It only looks; nothing on the server changes. It also tells you when installed updates are waiting for a reboot.
 
 ### Choose how your devices connect
 
@@ -129,6 +135,36 @@ Switching signs in to the new way and turns the old one off, without reinstallin
 
 The first time, Tailscale may ask you to **enable HTTPS** for your tailnet (T3 is served over HTTPS). Do it once in the [Tailscale admin console](https://login.tailscale.com/admin/dns), then run the same command again.
 
+### Give projects HTTPS addresses
+
+Browsers only allow some features over HTTPS or on localhost: the clipboard, passkeys, `crypto.randomUUID`, service workers. So a web app an agent is building on the server breaks when you open it from your laptop or phone over plain http. The gateway gives each project a private HTTPS address that every device on your tailnet can open.
+
+```bash
+outpost gateway SERVER_IP                  # turn it on, and choose which names
+outpost gateway add SERVER_IP myapp 3000   # myapp's web server is on port 3000
+```
+
+Setup asks about it too, after the logins: whether you want addresses at all (suggested when your devices use Tailscale already), which names, and for your own domain, which domain and whether to trust it on this computer now.
+
+**Which names?**
+
+- **Tailscale names** (the default), like `https://myapp-devbox.tail1234.ts.net`. Each name is a Tailscale Service with a real certificate, so every device just works. Nothing extra runs on the server. Names end with the server's name, so two servers' projects never clash.
+- **Your own domain**, like `https://myapp.devbox.test`. outpost runs Caddy and CoreDNS on the server, and its own certificate, which can only vouch for names under your domain. Each device trusts it once: open `http://devbox.test` on it, or scan the QR code outpost shows, and follow the steps for that device, or let outpost do it on the computer you run it from: say yes when setup asks, or run `outpost gateway trust SERVER_IP` later. On a Mac that covers Safari, Chrome, and Firefox-based browsers such as Zen, which outpost sets to use the Mac's trusted certificates. Use `.test` or `.internal`, which never exist on the internet. Not `.local`: that's for mDNS, which doesn't cross Tailscale.
+
+**More than one port.** A path on the same address can go to another port, say a socket server that needs the app's cookies, and a project can have extra addresses:
+
+```bash
+outpost gateway add SERVER_IP myapp 3000 --path /ws=3001 --name files.myapp=9000
+```
+
+Adding a project again replaces its addresses. `outpost gateway remove SERVER_IP myapp` takes them away.
+
+**The Tailscale side.** Tailscale only lets tagged machines host Services, so the gateway needs a few admin steps: the server tagged `tag:devbox`, a policy entry saying who may give that tag (plus copies of SSH rules that reached the server as one of your own devices, so SSH keeps working once it's tagged), a Service per name, approving the server as their host, and for your own domain, split DNS. outpost does them all if you paste a [Tailscale API key](https://login.tailscale.com/admin/settings/keys) (it opens that page for you), showing you the policy additions first. It also turns on MagicDNS and HTTPS certificates if they're off. A trust credential instead of a key needs the `policy_file`, `devices:core`, `services`, `dns` and `networking_settings` scopes. It keeps the key on your laptop for adding projects and moves. Without a key, it shows each step and checks it from the server.
+
+**Changing your mind.** `outpost gateway SERVER_IP` shows the current choice and lets you pick another: a different kind of names, a different domain, or off. Your projects carry over; their addresses change. Off keeps the list, so turning it back on restores them. Picking what the server already has checks the gateway and repairs anything that's wrong.
+
+**Moves** carry the gateway: its settings, your projects and the certificate. The new server takes the same addresses over, so bookmarks and trusted devices keep working.
+
 ### Sign in again
 
 Logins can expire, or you may want to switch account:
@@ -153,10 +189,10 @@ No reboot needed, and outpost still leaves 10 GB of disk free. Shrinking or remo
 ### Rename it
 
 ```sh
-outpost rename SERVER_IP tars
+outpost rename SERVER_IP devbox
 ```
 
-Sets the server's name, keeps it across reboots, and renames it in Tailscale too, so it's reachable at `tars.YOUR-TAILNET.ts.net`. T3 Connect may keep showing the name it saw first; naming the server during setup avoids that.
+Sets the server's name, keeps it across reboots, and renames it in Tailscale too, so it's reachable at `devbox.YOUR-TAILNET.ts.net`. T3 Connect may keep showing the name it saw first; naming the server during setup avoids that.
 
 ### Update it
 
@@ -204,7 +240,7 @@ If T3 Code doesn't show the server afterwards, sign it in again with `outpost lo
   <details>
   <summary>With Tailscale</summary>
 
-  On the server, run `tailscale serve 3000`, then open the `https://….ts.net` link it prints.
+  Give it an address with `outpost gateway add SERVER_IP myapp 3000`, which stays across restarts and moves. See [Give projects HTTPS addresses](#give-projects-https-addresses).
   </details>
 
   <details>
@@ -238,6 +274,7 @@ Or run plain `outpost move` and pick both from a list. It checks the old server,
 | Claude Code and Codex history, so agents can resume their sessions | Docker containers and their data. Recreate them from your compose files |
 | Your `CLAUDE.md`, skills, agents, commands and settings | Anything outside the `dev` user's home |
 | Your git identity (`~/.gitconfig`) | |
+| The gateway: your projects' addresses and its certificate | |
 
 **Afterwards:** send "continue" to any thread that was mid-turn. When you're happy, delete the old server at your provider and remove it from the [Tailscale admin console](https://login.tailscale.com/admin/machines). Until then, its files stay untouched and T3 there stays off. outpost refuses to bring T3 back on it, so two machines never answer as the same environment.
 
@@ -260,6 +297,10 @@ Start with `outpost status SERVER_IP`: it names the fix for most problems.
 | Some org repos are missing in T3 | The org restricts third-party apps. An org owner approves **GitHub CLI** under the org's **Settings → Third-party access**. |
 | `was already moved to …` | That server's work already moved. Move from the newer server instead. |
 | `it's retired` | The server's work was moved elsewhere. Use the new server instead, or delete `~/.t3/moved-to` on it to reuse it. |
+| `service hosts must be tagged nodes` | The server isn't tagged `tag:devbox` yet. Run `outpost gateway SERVER_IP` with an API key, or tag it in the [admin console](https://login.tailscale.com/admin/machines). |
+| A project's address says nothing answers | Start the project: the gateway passes HTTPS to its port on `127.0.0.1`. |
+| A new Tailscale name doesn't open | Tailscale can take a minute to publish a new name and make its certificate. |
+| Saved Tailscale API key stopped working | API access tokens expire within 90 days. outpost asks for a new one; a trust credential doesn't expire. |
 | Can't SSH in at all | Use your provider's web console, log in as root, and check `ufw status` and `systemctl status ssh`. |
 
 ## FAQ

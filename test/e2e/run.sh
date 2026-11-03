@@ -7,6 +7,9 @@
 #      T3 runs on the new server after a reboot, and the old one is retired.
 #   3. Backs up the new server and checks the file holds the work and T3 runs again.
 #   4. Runs the move again to check a re-run is safe.
+#   5. Installs the gateway for a domain of its own (Caddy, CoreDNS and its
+#      certificate authority) and checks a project answers over HTTPS, its name
+#      resolves, and the certificate can only vouch for that domain.
 #
 # Logins need a human, so on the new server tiny stand-ins answer "signed in".
 # Usage: test/e2e/run.sh   (needs Docker, Go and ~/.ssh/id_ed25519)
@@ -19,6 +22,8 @@ check() { if eval "$2"; then echo "  ok: $1"; else echo "  FAIL: $1"; return 1; 
 
 cleanup() {
   docker rm -f -v outpost-e2e-old outpost-e2e-new >/dev/null 2>&1 || true
+  # Each run's containers have new host keys; outpost's own ssh would refuse the old ones.
+  for port in $OLD $NEW; do ssh-keygen -R "[localhost]:$port" >/dev/null 2>&1 || true; done
   # outpost remembers the servers it sets up; keep these test ones out of your list.
   for list in "$HOME/Library/Application Support/outpost/servers" "${XDG_CONFIG_HOME:-$HOME/.config}/outpost/servers"; do
     if [ -f "$list" ]; then sed -i.bak -e "/^localhost:$OLD$/d" -e "/^localhost:$NEW$/d" "$list" && rm -f "$list.bak"; fi
@@ -103,7 +108,7 @@ check "setup refuses to revive it" 'grep -q retired /tmp/outpost-e2e-revive.log 
 
 echo "--- outpost status"
 "$BIN" status localhost:$NEW </dev/null > /tmp/outpost-e2e-status.log 2>&1 || { cat /tmp/outpost-e2e-status.log; exit 1; }
-check "status shows it healthy" 'grep -q "T3 Code, Docker and Tailscale running" /tmp/outpost-e2e-status.log && grep -q "Access T3 Connect" /tmp/outpost-e2e-status.log'
+check "status shows it healthy" 'grep -q "✓ T3 Code" /tmp/outpost-e2e-status.log && grep -q "T3 Connect" /tmp/outpost-e2e-status.log'
 
 echo "--- outpost backup"
 BACKUP="$(mktemp -d)/new.tar.gz"
@@ -118,5 +123,28 @@ echo "--- re-running the move is safe"
 check "skips the copy" 'grep -q "Already moved" /tmp/outpost-e2e-rerun.log'
 check "doesn't reboot a server in use" '! grep -q "Rebooting" /tmp/outpost-e2e-rerun.log'
 check "still the same environment" '[ "$(on_new "cat ~/.t3/userdata/environment-id")" = "$OLD_ENV" ]'
+
+echo "--- gateway with its own domain, on the server"
+# Tailscale can't run here, so the tailnet's side is left out: the gateway's
+# address and DNS are 127.0.0.1, and the files outpost writes are written by hand,
+# from the same templates.
+GW=.outpost/gateway
+ssh_to $NEW dev "mkdir -p ~/$GW/sites && cat > ~/$GW/Caddyfile" < "$ROOT/internal/setup/gateway/Caddyfile"
+ssh_to $NEW dev "cat > ~/$GW/Corefile" < "$ROOT/internal/setup/gateway/Corefile"
+ssh_to $NEW dev "printf '%s\n' MODE=domain GATEWAY_DOMAIN=e2e.test SUFFIX=new SERVICE=svc:gateway-new GATEWAY_ADDRESS=127.0.0.1 TAILSCALE_IP=127.0.0.1 > ~/$GW/gateway.env
+  printf '%s\n' 'app.{\$GATEWAY_DOMAIN} {' '	reverse_proxy 127.0.0.1:3001' '}' > ~/$GW/sites/app.caddy
+  mkdir -p /tmp/app && echo hello-from-app > /tmp/app/index.html
+  nohup python3 -m http.server 3001 --bind 127.0.0.1 --directory /tmp/app >/dev/null 2>&1 &"
+{ echo "GATEWAY_DOMAIN=e2e.test"; cat "$ROOT/internal/setup/gateway/install.sh"; } |
+  ssh_to $NEW dev 'cat > /tmp/gw.sh && sudo bash /tmp/gw.sh' > /tmp/outpost-e2e-gateway.log 2>&1 || { tail -30 /tmp/outpost-e2e-gateway.log; exit 1; }
+gw_up() { for _ in $(seq 20); do on_new "curl -s -o /dev/null --cacert ~/$GW/pki/e2e.test/root.crt --resolve app.e2e.test:44343:127.0.0.1 https://app.e2e.test:44343/" && return; sleep 1; done; return 1; }
+check "Caddy and CoreDNS running" '[ "$(on_new "systemctl is-active outpost-caddy outpost-dns" | sort -u)" = active ]'
+check "project answers over HTTPS, trusted by the root" 'gw_up && on_new "curl -s --cacert ~/$GW/pki/e2e.test/root.crt --resolve app.e2e.test:44343:127.0.0.1 https://app.e2e.test:44343/" | grep -q hello-from-app'
+check "its name resolves to the gateway" 'on_new "dig +short @127.0.0.1 app.e2e.test A" | grep -qx 127.0.0.1'
+check "other record types get an empty answer, not an error" 'on_new "dig @127.0.0.1 app.e2e.test HTTPS" | grep -q "status: NOERROR"'
+check "the root can only sign e2e.test" 'on_new "openssl x509 -in ~/$GW/pki/e2e.test/root.crt -noout -ext nameConstraints" | grep -q "DNS:e2e.test"'
+check "the root key is private" '[ "$(on_new "stat -c %a ~/$GW/pki/e2e.test/root.key")" = 600 ]'
+check "Caddy listens on loopback only" '! on_new "ss -Hltn" | grep -E ":(44343|44380|44319) " | grep -vq "127.0.0.1:"'
+check "re-running the install is safe" 'ssh_to $NEW dev "sudo bash /tmp/gw.sh" >/dev/null 2>&1 && gw_up'
 
 echo "PASS"

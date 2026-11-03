@@ -67,13 +67,29 @@ func nameServer(ctx context.Context, h remote.Host, admin, answer string, fresh 
 	return nil
 }
 
-// Rename renames a set-up server, in Tailscale too.
+// Rename renames a set-up server, in Tailscale too, asking for the name when it's "".
 func Rename(ctx context.Context, h remote.Host, name string) error {
 	if err := checkName(name); err != nil {
 		return err
 	}
 	if _, err := openActive(ctx, h); err != nil {
 		return err
+	}
+	if name == "" {
+		out, _ := h.Output(ctx, DevUser, "hostname")
+		now := strings.TrimSpace(string(out))
+		answer, err := ui.Ask.Input(ctx, "What should "+now+" be called?",
+			"T3 Code and Tailscale show this name. Leave it empty to keep "+now+".", "e.g. devbox", checkName)
+		if errors.Is(err, ui.ErrNoTerminal) {
+			return fmt.Errorf("run in a terminal to type it, or give it: outpost rename %s NAME", h)
+		}
+		if err != nil {
+			return err
+		}
+		if name = strings.TrimSpace(answer); name == "" {
+			ui.Check("Name", "unchanged: "+now)
+			return nil
+		}
 	}
 	return nameServer(ctx, h, DevUser, name, false)
 }

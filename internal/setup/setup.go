@@ -32,9 +32,9 @@ var (
 )
 
 // Setup prepares a server for T3 Code, reachable the given way, with swap the
-// size the user typed and the name they gave ("" asks on a fresh server). It is
-// safe to re-run on a finished server.
-func Setup(ctx context.Context, h remote.Host, access Access, swap, name string) error {
+// size the user typed, the name they gave ("" asks on a fresh server) and the
+// gateway answers in gw. It is safe to re-run on a finished server.
+func Setup(ctx context.Context, h remote.Host, access Access, swap, name string, gw GatewayOptions) error {
 	if err := checkName(name); err != nil {
 		return err
 	}
@@ -65,6 +65,7 @@ func Setup(ctx context.Context, h remote.Host, access Access, swap, name string)
 			return install(ctx, h, admin, swap)
 		}},
 		{"Logins", func(ctx context.Context) error { return runLogins(ctx, d, access) }},
+		{"Gateway", func(ctx context.Context) error { return gatewayStep(ctx, d, access, gw) }},
 		// A server already running T3 may have agents at work, so it gets a health check, not a reboot.
 		{"Final check", func(ctx context.Context) error { return finalCheck(ctx, d, !inUse) }},
 	})
@@ -197,8 +198,15 @@ func finalCheck(ctx context.Context, d dev, reboot bool) (err error) {
 	}
 
 	p.Task("T3 Code, Docker and Tailscale running")
+	gw, routes := d.gateway(ctx)
 	var down []string
-	if err := poll(ctx, servicesTimeout, func() bool { down = d.servicesDown(ctx); return len(down) == 0 }); err != nil {
+	if err := poll(ctx, servicesTimeout, func() bool {
+		down = d.servicesDown(ctx)
+		if gw.active() {
+			down = append(down, d.gatewayDown(ctx, gw, routes)...)
+		}
+		return len(down) == 0
+	}); err != nil {
 		return fmt.Errorf("not everything is running (%s). Run the same command again to repair it", strings.Join(down, ", "))
 	}
 	return nil

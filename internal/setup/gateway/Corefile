@@ -1,0 +1,18 @@
+# outpost's gateway DNS: every name under {$GATEWAY_DOMAIN} is the gateway.
+# Devices ask here through Tailscale split DNS. Nothing else is answered, and it
+# listens on the tailnet address only. Made by outpost; settings are in gateway.env.
+{$GATEWAY_DOMAIN}:53 {
+	bind {$TAILSCALE_IP}
+	template IN A {$GATEWAY_DOMAIN} {
+		answer "{{ .Name }} 60 IN A {$GATEWAY_ADDRESS}"
+	}
+	template IN AAAA {$GATEWAY_DOMAIN} {
+		rcode NOERROR
+	}
+	# Any other question (browsers also ask for HTTPS records) gets an empty
+	# answer, not an error, so lookups stay quick.
+	template ANY ANY {$GATEWAY_DOMAIN} {
+		rcode NOERROR
+	}
+	errors
+}

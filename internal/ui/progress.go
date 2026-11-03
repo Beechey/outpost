@@ -90,6 +90,18 @@ func (p *Progress) Done(err error) {
 	p.finish(mark)
 }
 
+// Clear stops the spinner and erases its line, for a wait that needs no record.
+func (p *Progress) Clear() {
+	p.mu.Lock()
+	p.task = ""
+	p.mu.Unlock()
+	close(p.stop)
+	<-p.stopped
+	if isTTY {
+		fmt.Print("\r\033[K")
+	}
+}
+
 func (p *Progress) finish(mark string) {
 	if p.task == "" {
 		return
@@ -121,4 +133,37 @@ func (p *Progress) spin() {
 			p.mu.Unlock()
 		}
 	}
+}
+
+// Warn colours text as a problem.
+func Warn(s string) string { return failed.Render(s) }
+
+var (
+	cardBox   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#3A4152")).Padding(1, 2)
+	cardTitle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#F8FAFC"))
+	cardLabel = lipgloss.NewStyle().Foreground(lipgloss.Color("#8B90A0")).Width(10)
+)
+
+// A Row is one line of a Card: a label and its value.
+type Row struct{ Label, Value string }
+
+// Card draws a titled box of labelled rows, with an optional subtitle.
+func Card(title, subtitle string, rows []Row) string {
+	head := Accent.Render("▲") + " " + cardTitle.Render(title)
+	if subtitle != "" {
+		head += "  " + Muted.Render(subtitle)
+	}
+	lines := []string{head, ""}
+	for _, r := range rows {
+		lines = append(lines, cardLabel.Render(r.Label)+r.Value)
+	}
+	return cardBox.Render(lipgloss.JoinVertical(lipgloss.Left, lines...))
+}
+
+// Mark is ✓ name, or ✗ name when bad.
+func Mark(name string, bad bool) string {
+	if bad {
+		return failed.Render("✗ " + name)
+	}
+	return Accent.Render("✓") + " " + name
 }

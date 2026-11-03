@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Trust {{.Domain}} on this device</title>
+<style>
+  :root {
+    --paper: #eef2f5; --sheet: #f8fafb; --ink: #14202b; --slate: #5b6b7a; --rule: #cfd8e0;
+    --trusted: #1f7a4d; --waiting: #a15c00; --flag: #4ade80;
+    --serif: "New York", "Iowan Old Style", Charter, "Source Serif Pro", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --paper: #0e1722; --sheet: #142130; --ink: #e6edf3; --slate: #93a4b4; --rule: #26384a;
+            --trusted: #4cc38a; --waiting: #e0a040; }
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--paper); }
+  body { margin: 0; color: var(--ink); font: 17px/1.55 var(--sans); }
+  main { max-width: 640px; margin: 0 auto; padding: 40px 20px 72px; }
+  a { color: inherit; }
+  :focus-visible { outline: 3px solid var(--trusted); outline-offset: 3px; border-radius: 6px; }
+
+  .from { display: flex; align-items: center; gap: 10px; color: var(--slate); font-size: 15px; margin: 0 0 28px; }
+  .from svg { width: 20px; height: 20px; flex: none; }
+  h1 { font: 600 clamp(30px, 6vw, 40px)/1.12 var(--serif); letter-spacing: -.01em; margin: 0 0 12px; }
+  .lead { color: var(--slate); margin: 0 0 32px; max-width: 34em; }
+
+  /* The credential: what this certificate is, and whether this device trusts it. */
+  .pass { position: relative; background: var(--sheet); border: 1px solid var(--rule); border-radius: 18px;
+          padding: 24px 24px 20px; margin: 0 0 40px; overflow: hidden; }
+  .pass::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .5;
+          background: repeating-radial-gradient(circle at 110% -10%, transparent 0 10px, var(--rule) 10px 11px);
+          mask: linear-gradient(105deg, transparent 45%, #000 100%); -webkit-mask: linear-gradient(105deg, transparent 45%, #000 100%); }
+  .pass .domain { position: relative; font: 600 26px/1.2 var(--mono); margin: 0 0 18px; overflow-wrap: anywhere; }
+  .pass dl { position: relative; display: grid; grid-template-columns: max-content 1fr; gap: 6px 18px; margin: 0; font-size: 15px; }
+  .pass dt { color: var(--slate); }
+  .pass dd { margin: 0; overflow-wrap: anywhere; }
+  .pass .fp { font: 13px/1.5 var(--mono); }
+  .stamp { position: relative; display: inline-flex; align-items: center; gap: 8px; margin: 20px 0 0;
+           border: 2px solid currentColor; border-radius: 999px; padding: 4px 14px 4px 10px; font-weight: 650; font-size: 15px;
+           color: var(--waiting); }
+  .stamp::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: currentColor; }
+  .stamp[data-state="trusted"] { color: var(--trusted); animation: stamp .45s cubic-bezier(.2,1.6,.4,1); }
+  .stamp[data-state="checking"] { color: var(--slate); }
+  @keyframes stamp { from { transform: scale(1.35) rotate(-4deg); opacity: 0; } to { transform: none; opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .stamp[data-state="trusted"] { animation: none; } }
+
+  h2 { font: 600 22px/1.25 var(--serif); margin: 0 0 14px; }
+  section { margin: 0 0 40px; }
+
+  /* Steps for each kind of device. The one this device is gets opened and moved first. */
+  details.device { border-top: 1px solid var(--rule); }
+  details.device:last-of-type { border-bottom: 1px solid var(--rule); }
+  details.device > summary { cursor: pointer; list-style: none; padding: 14px 0; font-weight: 600; display: flex; justify-content: space-between; gap: 12px; }
+  details.device > summary::-webkit-details-marker { display: none; }
+  details.device > summary::after { content: "+"; color: var(--slate); font-weight: 400; }
+  details.device[open] > summary::after { content: "–"; }
+  details.device .here { color: var(--trusted); font-weight: 500; font-size: 15px; margin-left: auto; margin-right: 12px; }
+  details.device:not(.is-here) .here { display: none; }
+  .body { padding: 0 0 20px; }
+  ol.steps { margin: 14px 0 0; padding: 0; list-style: none; counter-reset: step; }
+  ol.steps li { counter-increment: step; position: relative; padding: 0 0 12px 40px; }
+  ol.steps li::before { content: counter(step); position: absolute; left: 0; top: 0; width: 26px; height: 26px; border-radius: 50%;
+                        border: 1.5px solid var(--rule); display: grid; place-items: center; font-size: 14px; color: var(--slate); }
+  .btn { display: inline-block; background: var(--ink); color: var(--paper); text-decoration: none; font-weight: 600;
+         border-radius: 12px; padding: 11px 18px; margin: 4px 10px 4px 0; }
+  .btn.quiet { background: transparent; color: var(--ink); border: 1.5px solid var(--rule); }
+  pre { background: var(--sheet); border: 1px solid var(--rule); border-radius: 12px; padding: 12px 14px; margin: 12px 0 0;
+        overflow-x: auto; font: 14px/1.6 var(--mono); }
+  code { font-family: var(--mono); font-size: .9em; }
+  b { font-weight: 600; }
+
+  .projects { list-style: none; margin: 0; padding: 0; }
+  .projects li { padding: 14px 0; border-top: 1px solid var(--rule); }
+  .projects li:last-child { border-bottom: 1px solid var(--rule); }
+  .projects a.name { font-weight: 650; font-size: 19px; text-decoration: none; }
+  .projects a.name:hover { text-decoration: underline; }
+  .projects .url { display: block; color: var(--slate); font: 14px/1.5 var(--mono); overflow-wrap: anywhere; }
+  .projects .also { display: block; color: var(--slate); font-size: 14px; margin-top: 2px; }
+  .empty { color: var(--slate); }
+  .note { color: var(--slate); font-size: 15px; }
+</style>
+</head>
+<body>
+<main>
+  <p class="from">
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 21 11 7l8 14Z" fill="currentColor"/><path d="M11 7V2" stroke="currentColor" stroke-width="1.5"/><path d="M11 2h6l-2 2 2 2h-6Z" fill="var(--flag)"/></svg>
+    outpost gateway on {{.Server}}
+  </p>
+  <h1 id="title">Trust {{.Domain}} on this device</h1>
+  <p class="lead">Your projects on {{.Server}} have private HTTPS addresses under {{.Domain}}. Trust this certificate once and every one of them opens securely here.</p>
+
+  <div class="pass">
+    <p class="domain">{{.Domain}}</p>
+    <dl>
+      <dt>Vouches for</dt><dd>Names under {{.Domain}}, and nothing else</dd>
+      <dt>Valid until</dt><dd>{{.Expires}}</dd>
+      <dt>Fingerprint</dt><dd class="fp">SHA-256 {{.Fingerprint}}</dd>
+    </dl>
+    <div class="stamp" id="stamp" data-state="checking" role="status" aria-live="polite">Checking this device</div>
+  </div>
+
+  <section id="steps">
+    <h2 id="steps-title">How to trust it</h2>
+    <div id="devices">
+      <details class="device" id="ios">
+        <summary>iPhone or iPad<span class="here">This device</span></summary>
+        <div class="body">
+          <a class="btn" href="/outpost.mobileconfig">Download the profile</a>
+          <ol class="steps">
+            <li>Tap <b>Allow</b>, then open <b>Settings</b> and tap <b>Profile Downloaded → Install</b>.</li>
+            <li>Open <b>Settings → General → About → Certificate Trust Settings</b>.</li>
+            <li>Turn on <b>outpost {{.Domain}}</b>, then come back here.</li>
+          </ol>
+        </div>
+      </details>
+      <details class="device" id="mac">
+        <summary>Mac<span class="here">This device</span></summary>
+        <div class="body">
+          <p class="note">With outpost on this Mac, one command does it all: <code>outpost gateway trust {{.Address}}</code></p>
+          <a class="btn" href="/root.crt">Download the certificate</a>
+          <ol class="steps">
+            <li>Open the file. Keychain Access adds <b>outpost {{.Domain}}</b>.</li>
+            <li>Double-click it, open <b>Trust</b>, and set <b>When using this certificate</b> to <b>Always Trust</b>.</li>
+            <li>Close the window and enter your password.</li>
+          </ol>
+          <p class="note">A Mac needs Always Trust even after installing the profile: the profile alone doesn't trust it for websites.</p>
+        </div>
+      </details>
+      <details class="device" id="firefox">
+        <summary>Firefox or Zen<span class="here">This browser</span></summary>
+        <div class="body">
+          <a class="btn" href="/root.crt">Download the certificate</a>
+          <ol class="steps">
+            <li>Open <b>Settings → Privacy &amp; Security</b>, and under Certificates click <b>View Certificates</b>.</li>
+            <li>On <b>Authorities</b>, click <b>Import</b> and pick the file.</li>
+            <li>Tick <b>Trust this CA to identify websites</b>, then click OK.</li>
+          </ol>
+          <p class="note">These browsers keep their own list, so they need this even after the system trusts it.</p>
+        </div>
+      </details>
+      <details class="device" id="android">
+        <summary>Android<span class="here">This device</span></summary>
+        <div class="body">
+          <a class="btn" href="/root.crt">Download the certificate</a>
+          <ol class="steps">
+            <li>Open <b>Settings → Security → More security settings → Encryption &amp; credentials</b>.</li>
+            <li>Tap <b>Install a certificate → CA certificate</b>, and pick the file.</li>
+          </ol>
+        </div>
+      </details>
+      <details class="device" id="windows">
+        <summary>Windows<span class="here">This device</span></summary>
+        <div class="body">
+          <a class="btn" href="/root.crt">Download the certificate</a>
+          <ol class="steps">
+            <li>Open the file and click <b>Install Certificate</b>, then choose <b>Local Machine</b>.</li>
+            <li>Choose <b>Place all certificates in the following store → Trusted Root Certification Authorities</b>, and finish.</li>
+          </ol>
+        </div>
+      </details>
+      <details class="device" id="linux">
+        <summary>Linux<span class="here">This device</span></summary>
+        <div class="body">
+<pre>curl -fsSO http://{{.Domain}}/root.crt
+sudo cp root.crt /usr/local/share/ca-certificates/outpost-{{.Domain}}.crt
+sudo update-ca-certificates</pre>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <section>
+    <h2>Projects on {{.Server}}</h2>
+    {{if .Projects}}
+    <ul class="projects">
+      {{range .Projects}}<li>
+        <a class="name" href="{{.URL}}">{{.Name}}</a>
+        <span class="url">{{.URL}}</span>
+        {{if .Also}}<span class="also">Also uses {{range $i, $a := .Also}}{{if $i}}, {{end}}<code>{{$a}}</code>{{end}}, for its own requests</span>{{end}}
+      </li>{{end}}
+    </ul>
+    {{else}}
+    <p class="empty">None yet. Give one an address with <code>outpost gateway add {{.Address}} myapp 3000</code>.</p>
+    {{end}}
+  </section>
+
+  <p class="note">This device needs Tailscale, signed in to the same tailnet as {{.Server}}.</p>
+</main>
+<script>
+(() => {
+  // Open this device's steps first. Firefox-based browsers keep their own certificates, so they come first on any system.
+  const ua = navigator.userAgent;
+  const ipad = /Macintosh/.test(ua) && navigator.maxTouchPoints > 1;
+  const id = /iPhone|iPad|iPod/.test(ua) || ipad ? "ios" : /Firefox\//.test(ua) ? "firefox" : /Android/.test(ua) ? "android"
+    : /Macintosh/.test(ua) ? "mac" : /Windows/.test(ua) ? "windows" : /Linux/.test(ua) ? "linux" : "";
+  const here = document.getElementById(id);
+  if (here) {
+    here.classList.add("is-here");
+    here.open = true;
+    here.parentNode.prepend(here);
+  }
+
+  // Ask the gateway for a page over HTTPS. It loads only if this device trusts the certificate.
+  const stamp = document.getElementById("stamp");
+  const show = (state, text) => { stamp.dataset.state = state; stamp.textContent = text; };
+  let trusted = false;
+  const check = () => fetch("https://{{.Domain}}/trusted?" + Date.now(), { mode: "no-cors", cache: "no-store" })
+    .then(() => {
+      if (trusted) return;
+      trusted = true;
+      show("trusted", "Trusted on this device");
+      document.getElementById("title").textContent = "This device trusts {{.Domain}}";
+      document.getElementById("steps-title").textContent = "Trust it on other devices";
+      if (here) here.open = false;
+    })
+    .catch(() => { if (!trusted) show("waiting", "Not trusted on this device yet"); });
+  check();
+  // Check again on return from Settings, so the stamp changes once the steps are done.
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) check(); });
+  setInterval(() => { if (!trusted && !document.hidden) check(); }, 4000);
+})();
+</script>
+</body>
+</html>

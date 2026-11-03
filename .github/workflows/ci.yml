@@ -21,7 +21,7 @@ jobs:
       - run: go vet ./...
       - run: go test ./...
       - name: shellcheck
-        run: shellcheck internal/setup/scripts/*.sh test/e2e/run.sh
+        run: shellcheck internal/setup/scripts/*.sh internal/setup/gateway/install.sh test/e2e/run.sh
 
   e2e:
     # Sets up and moves real servers (systemd containers). See test/e2e/run.sh.
