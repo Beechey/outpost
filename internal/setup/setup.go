@@ -32,8 +32,12 @@ var (
 )
 
 // Setup prepares a server for T3 Code, reachable the given way, with swap the
-// size the user typed ("" asks). It is safe to re-run on a finished server.
-func Setup(ctx context.Context, h remote.Host, access Access, swap string) error {
+// size the user typed and the name they gave ("" asks on a fresh server). It is
+// safe to re-run on a finished server.
+func Setup(ctx context.Context, h remote.Host, access Access, swap, name string) error {
+	if err := checkName(name); err != nil {
+		return err
+	}
 	d := dev{h: h} // the dev user exists once the install has run
 	var admin string
 	var inUse bool
@@ -54,7 +58,12 @@ func Setup(ctx context.Context, h remote.Host, access Access, swap string) error
 			access = resolveAccess(ctx, d, true, access)
 			return nil
 		}},
-		{"Installing (3-5 minutes)", func(ctx context.Context) error { return install(ctx, h, admin, swap) }},
+		{"Installing (3-5 minutes)", func(ctx context.Context) error {
+			if err := nameServer(ctx, h, admin, name, admin != DevUser); err != nil {
+				return err
+			}
+			return install(ctx, h, admin, swap)
+		}},
 		{"Logins", func(ctx context.Context) error { return runLogins(ctx, d, access) }},
 		// A server already running T3 may have agents at work, so it gets a health check, not a reboot.
 		{"Final check", func(ctx context.Context) error { return finalCheck(ctx, d, !inUse) }},

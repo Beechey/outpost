@@ -159,9 +159,9 @@ func TestStatusChangesNothing(t *testing.T) {
 func TestSetupAsksForSwap(t *testing.T) {
 	ctx := testEnv(t)
 	srv := roomy(newFake("fresh", "root").healthy())
-	answer(t, "6")
+	answer(t, "", "6") // keep the name, then 6 GB of swap
 
-	if err := Setup(ctx, srv, AccessUnset, ""); err != nil {
+	if err := Setup(ctx, srv, AccessUnset, "", ""); err != nil {
 		t.Fatal(err)
 	}
 	if !addsSwap(srv, 6) {
@@ -198,13 +198,26 @@ func TestAccessAsksWhichWay(t *testing.T) {
 func TestMoveConfirmedAtPrompt(t *testing.T) {
 	ctx := testEnv(t)
 	old, dst := movable("old"), newFake("new", "root").healthy()
-	answer(t, "yes", "0") // move, then no swap
+	answer(t, "yes", "", "0") // move, keep the name, then no swap
 
-	if err := Move(ctx, old, dst, false, AccessUnset, ""); err != nil {
+	if err := Move(ctx, old, dst, false, AccessUnset, "", ""); err != nil {
 		t.Fatal(err)
 	}
 	if !old.ran("copy to new") {
 		t.Error("a confirmed move should copy")
+	}
+}
+
+func TestMoveAsksForAName(t *testing.T) {
+	ctx := testEnv(t)
+	old, dst := movable("old"), newFake("new", "root").healthy()
+	answer(t, "yes", "tars", "0") // move, name it tars, no swap
+
+	if err := Move(ctx, old, dst, false, AccessUnset, "", ""); err != nil {
+		t.Fatal(err)
+	}
+	if !dst.ran("hostnamectl set-hostname tars") {
+		t.Error("the new server should be named tars")
 	}
 }
 
@@ -213,7 +226,7 @@ func TestCtrlCAtAQuestionChangesNothing(t *testing.T) {
 	old, dst := movable("old"), newFake("new", "root").healthy()
 	answer(t, "^C")
 
-	err := Move(ctx, old, dst, false, AccessUnset, "")
+	err := Move(ctx, old, dst, false, AccessUnset, "", "")
 	if !errors.Is(err, ui.ErrCancelled) {
 		t.Fatalf("want cancelled, got %v", err)
 	}
@@ -290,5 +303,17 @@ func TestParseAccess(t *testing.T) {
 	}
 	if _, err := ParseAccess("vpn"); err == nil {
 		t.Error("want an error for an unknown way in")
+	}
+}
+
+func TestRenameASetUpServer(t *testing.T) {
+	ctx := testEnv(t)
+	srv := newFake("box", DevUser)
+
+	if err := Rename(ctx, srv, "tars"); err != nil {
+		t.Fatal(err)
+	}
+	if !srv.ran("dev: sudo bash -c") || !srv.ran("hostnamectl set-hostname tars") || !srv.ran("tailscale set --hostname=tars") {
+		t.Error("should rename the server and Tailscale, as dev with sudo")
 	}
 }

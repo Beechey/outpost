@@ -14,8 +14,10 @@ import (
 
 // A login signs the server in to one account. Check is a remote command that
 // succeeds when it's already signed in; Run signs in, prompting the user.
+// After, if set, runs here once Run succeeds.
 type login struct {
 	Name, Check, Run, Hint string
+	After                  func(dev, context.Context) error
 }
 
 var accountLogins = []login{
@@ -35,9 +37,10 @@ var accountLogins = []login{
 		Name: "GitHub",
 		// setup-git lets plain git use these credentials, so private repos clone.
 		Check: "gh auth status >/dev/null 2>&1 && gh auth setup-git",
-		// The server has no browser; GH_BROWSER=true stops gh trying to open one.
-		Run:  "GH_BROWSER=true gh auth login --hostname github.com --git-protocol https --web && gh auth setup-git",
-		Hint: "Open github.com/login/device on your laptop and enter the code below.",
+		// The server has no browser. With prompts off, gh prints the link instead of
+		// "Press Enter to open github.com" and skips the git question setup-git answers.
+		Run:  "GH_PROMPT_DISABLED=1 gh auth login --hostname github.com --git-protocol https --web && gh auth setup-git",
+		Hint: "Open the link on your laptop and enter the code.",
 	},
 }
 
@@ -65,6 +68,11 @@ func runLogin(ctx context.Context, d dev, l login) error {
 	lipgloss.Println("\n  " + ui.Accent.Render("◆") + " " + ui.Bold.Render(l.Name) + "  " + ui.Muted.Render(l.Hint))
 	if err := d.interactive(ctx, l.Run); err != nil {
 		return fmt.Errorf("%s sign-in didn't finish. Run the same command again to retry: %w", l.Name, err)
+	}
+	if l.After != nil {
+		if err := l.After(d, ctx); err != nil {
+			return err
+		}
 	}
 	ui.Check(l.Name, "signed in")
 	return nil

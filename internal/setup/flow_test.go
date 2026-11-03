@@ -1,10 +1,12 @@
 package setup
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -13,7 +15,7 @@ func TestSetupFreshServer(t *testing.T) {
 	ctx := testEnv(t)
 	srv := newFake("fresh", "root").healthy()
 
-	if err := Setup(ctx, srv, AccessUnset, ""); err != nil {
+	if err := Setup(ctx, srv, AccessUnset, "", ""); err != nil {
 		t.Fatal(err)
 	}
 	if !srv.ran("root: install script") {
@@ -28,7 +30,7 @@ func TestSetupCopiesKeyWhenNeeded(t *testing.T) {
 	ctx := testEnv(t)
 	srv := newFake("fresh").healthy() // nobody can log in yet
 
-	if err := Setup(ctx, srv, AccessUnset, ""); err != nil {
+	if err := Setup(ctx, srv, AccessUnset, "", ""); err != nil {
 		t.Fatal(err)
 	}
 	if !srv.ran("ssh-copy-id root") {
@@ -40,7 +42,7 @@ func TestSetupServerInUseSkipsReboot(t *testing.T) {
 	ctx := testEnv(t)
 	srv := newFake("busy", DevUser).healthy().on(cmdT3Installed, "true", nil)
 
-	if err := Setup(ctx, srv, AccessUnset, ""); err != nil {
+	if err := Setup(ctx, srv, AccessUnset, "", ""); err != nil {
 		t.Fatal(err)
 	}
 	if srv.ran("systemctl reboot") {
@@ -55,7 +57,7 @@ func TestSetupRefusesRetiredServer(t *testing.T) {
 	ctx := testEnv(t)
 	srv := newFake("old", DevUser).healthy().on(cmdMovedTo, "new:22\n", nil)
 
-	err := Setup(ctx, srv, AccessUnset, "")
+	err := Setup(ctx, srv, AccessUnset, "", "")
 	if err == nil || !strings.Contains(err.Error(), "retired") {
 		t.Fatalf("want a retired-server error, got %v", err)
 	}
@@ -72,7 +74,7 @@ func TestSetupReportsServicesThatDontStart(t *testing.T) {
 	srv := newFake("broken", DevUser).on(cmdT3Installed, "true", nil).
 		on(cmdServices, "docker active\ntailscaled active\nT3 failed\n", nil)
 
-	err := Setup(ctx, srv, AccessUnset, "")
+	err := Setup(ctx, srv, AccessUnset, "", "")
 	if err == nil || !strings.Contains(err.Error(), "T3 is failed") {
 		t.Fatalf("want T3 named as not running, got %v", err)
 	}
@@ -87,7 +89,7 @@ func TestMoveCopiesAndRetiresOld(t *testing.T) {
 	ctx := testEnv(t)
 	old, dst := movable("old"), newFake("new", "root").healthy()
 
-	if err := Move(ctx, old, dst, true, AccessUnset, ""); err != nil {
+	if err := Move(ctx, old, dst, true, AccessUnset, "", ""); err != nil {
 		t.Fatal(err)
 	}
 	if !old.ran("copy to new") {
@@ -109,7 +111,7 @@ func TestMoveCopyFailureRestartsOld(t *testing.T) {
 	old, dst := movable("old"), newFake("new", "root").healthy()
 	old.copyErr = errors.New("disk full")
 
-	err := Move(ctx, old, dst, true, AccessUnset, "")
+	err := Move(ctx, old, dst, true, AccessUnset, "", "")
 	if err == nil || !strings.Contains(err.Error(), "running on old again") {
 		t.Fatalf("want a restarted-old error, got %v", err)
 	}
@@ -127,7 +129,7 @@ func TestMoveCopyFailureSaysWhenRestartFails(t *testing.T) {
 	old.copyErr = errors.New("disk full")
 	old.on(cmdT3Start, "", errors.New("unit failed"))
 
-	err := Move(ctx, old, dst, true, AccessUnset, "")
+	err := Move(ctx, old, dst, true, AccessUnset, "", "")
 	if err == nil || !strings.Contains(err.Error(), "still stopped") {
 		t.Fatalf("want a still-stopped error, got %v", err)
 	}
@@ -138,7 +140,7 @@ func TestMoveRerunDoesntCopyOrReboot(t *testing.T) {
 	old := movable("old").on(surveyCmd(), "t3 yes\nmoved new\n", nil)
 	dst := newFake("new", DevUser).healthy().on(cmdT3Installed, "true", nil)
 
-	if err := Move(ctx, old, dst, true, AccessUnset, ""); err != nil {
+	if err := Move(ctx, old, dst, true, AccessUnset, "", ""); err != nil {
 		t.Fatal(err)
 	}
 	if old.ran("copy to") {
@@ -154,7 +156,7 @@ func TestMoveRefusesServerMovedElsewhere(t *testing.T) {
 	old := movable("old").on(surveyCmd(), "t3 yes\nmoved other\n", nil)
 	dst := newFake("new", "root").healthy()
 
-	err := Move(ctx, old, dst, true, AccessUnset, "")
+	err := Move(ctx, old, dst, true, AccessUnset, "", "")
 	if err == nil || !strings.Contains(err.Error(), "already moved to other") {
 		t.Fatalf("want an already-moved error, got %v", err)
 	}
@@ -167,7 +169,7 @@ func TestMoveNeedsConfirmationWithoutTerminal(t *testing.T) {
 	ctx := testEnv(t)
 	old, dst := movable("old"), newFake("new", "root").healthy()
 
-	err := Move(ctx, old, dst, false, AccessUnset, "") // tests have no terminal
+	err := Move(ctx, old, dst, false, AccessUnset, "", "") // tests have no terminal
 	if err == nil || !strings.Contains(err.Error(), "--yes") {
 		t.Fatalf("want a confirm error, got %v", err)
 	}
@@ -180,7 +182,7 @@ func TestSetupTailscaleMode(t *testing.T) {
 	ctx := testEnv(t)
 	srv := newFake("fresh", "root").healthy().on(t3Logins[AccessTailscale].Check, "", errors.New("not yet"))
 
-	if err := Setup(ctx, srv, AccessTailscale, ""); err != nil {
+	if err := Setup(ctx, srv, AccessTailscale, "", ""); err != nil {
 		t.Fatal(err)
 	}
 	if !srv.ran("t3 up --lan --no-connect") || !srv.ran("t3 pair --tailscale") {
@@ -195,7 +197,7 @@ func TestSetupKeepsTailscaleOnRerun(t *testing.T) {
 	ctx := testEnv(t)
 	srv := newFake("busy", DevUser).healthy() // every check passes: already on the tailnet only
 
-	if err := Setup(ctx, srv, AccessUnset, ""); err != nil {
+	if err := Setup(ctx, srv, AccessUnset, "", ""); err != nil {
 		t.Fatal(err)
 	}
 	if srv.ran("t3 up") {
@@ -207,7 +209,7 @@ func TestSetupSwitchesToConnect(t *testing.T) {
 	ctx := testEnv(t)
 	srv := newFake("busy", DevUser).healthy().on(t3Logins[AccessConnect].Check, "", errors.New("off"))
 
-	if err := Setup(ctx, srv, AccessConnect, ""); err != nil {
+	if err := Setup(ctx, srv, AccessConnect, "", ""); err != nil {
 		t.Fatal(err)
 	}
 	if !srv.ran("t3 up --connect --no-lan") {
@@ -255,7 +257,7 @@ func TestSetupAddsSwapWhenChosen(t *testing.T) {
 	ctx := testEnv(t)
 	srv := roomy(newFake("fresh", "root").healthy())
 
-	if err := Setup(ctx, srv, AccessUnset, "4"); err != nil {
+	if err := Setup(ctx, srv, AccessUnset, "4", ""); err != nil {
 		t.Fatal(err)
 	}
 	if !addsSwap(srv, 4) {
@@ -268,7 +270,7 @@ func TestSetupAddsNoSwapUnlessChosen(t *testing.T) {
 		ctx := testEnv(t)
 		srv := roomy(newFake("fresh", "root").healthy())
 
-		if err := Setup(ctx, srv, AccessUnset, gb); err != nil {
+		if err := Setup(ctx, srv, AccessUnset, gb, ""); err != nil {
 			t.Fatal(err)
 		}
 		if madeSwap(srv) {
@@ -281,7 +283,7 @@ func TestSetupKeepsExistingSwap(t *testing.T) {
 	ctx := testEnv(t)
 	srv := newFake("busy", DevUser).healthy().on(memoryCmd, "ram 4\nswapkb 2097148\nfile 2\ndisk 50\n", nil)
 
-	if err := Setup(ctx, srv, AccessUnset, "8"); err != nil {
+	if err := Setup(ctx, srv, AccessUnset, "8", ""); err != nil {
 		t.Fatal(err)
 	}
 	if madeSwap(srv) {
@@ -293,7 +295,7 @@ func TestSetupRefusesSwapThatDoesntFit(t *testing.T) {
 	ctx := testEnv(t)
 	srv := newFake("small", "root").healthy().on(memoryCmd, "ram 2\nswapkb 0\nfile 0\ndisk 14\n", nil)
 
-	err := Setup(ctx, srv, AccessUnset, "8")
+	err := Setup(ctx, srv, AccessUnset, "8", "")
 	if err == nil || !strings.Contains(err.Error(), "doesn't fit") {
 		t.Fatalf("want a doesn't-fit error, got %v", err)
 	}
@@ -306,7 +308,7 @@ func TestMoveWithYesAddsNoSwap(t *testing.T) {
 	ctx := testEnv(t)
 	old, dst := movable("old"), roomy(newFake("new", "root").healthy())
 
-	if err := Move(ctx, old, dst, true, AccessUnset, ""); err != nil {
+	if err := Move(ctx, old, dst, true, AccessUnset, "", ""); err != nil {
 		t.Fatal(err)
 	}
 	if madeSwap(dst) {
@@ -445,5 +447,72 @@ func TestSwapNeedsSizeWithoutTerminal(t *testing.T) {
 	err := Swap(ctx, srv, "")
 	if err == nil || !strings.Contains(err.Error(), "outpost swap box GB") {
 		t.Fatalf("want a give-the-size error, got %v", err)
+	}
+}
+
+func TestSetupNamesTheServerFirst(t *testing.T) {
+	ctx := testEnv(t)
+	srv := newFake("fresh", "root").healthy()
+
+	if err := Setup(ctx, srv, AccessUnset, "", "tars"); err != nil {
+		t.Fatal(err)
+	}
+	// T3 Connect keeps the name it first sees, so the rename comes before the install and logins.
+	named, installed := -1, -1
+	for i, c := range srv.cmds {
+		if named < 0 && strings.Contains(c, "hostnamectl set-hostname tars") {
+			named = i
+		}
+		if installed < 0 && strings.Contains(c, "install script") {
+			installed = i
+		}
+	}
+	if named < 0 || installed < 0 || named > installed {
+		t.Errorf("should rename to tars before installing (rename at %d, install at %d)", named, installed)
+	}
+}
+
+func TestSetupRefusesABadName(t *testing.T) {
+	ctx := testEnv(t)
+	srv := newFake("fresh", "root").healthy()
+
+	if err := Setup(ctx, srv, AccessUnset, "", "My Server"); err == nil || !strings.Contains(err.Error(), "can't be a server name") {
+		t.Fatalf("want a bad-name error, got %v", err)
+	}
+	if len(srv.cmds) > 0 {
+		t.Error("nothing should run on the server")
+	}
+}
+
+func TestSetupRerunKeepsTheName(t *testing.T) {
+	ctx := testEnv(t)
+	srv := newFake("busy", DevUser).healthy()
+	asked := answer(t)
+
+	if err := Setup(ctx, srv, AccessUnset, "", ""); err != nil {
+		t.Fatal(err)
+	}
+	if srv.ran("hostnamectl") || slices.Contains(asked.asked, "What should this server be called?") {
+		t.Error("a set-up server keeps its name unless --name is given")
+	}
+}
+
+func TestPairOpensLinkOnThisComputer(t *testing.T) {
+	ctx := testEnv(t)
+	answer(t, "here")
+	srv := newFake("box", DevUser).on(tailscalePair, "Pairing URL: https://box/pair#token=X\nApp link: t3code://pair?x=1\nToken: X\n", nil)
+	var opened string
+	saved := openURL
+	openURL = func(_ context.Context, url string) error { opened = url; return nil }
+	t.Cleanup(func() { openURL = saved })
+
+	if err := Pair(ctx, srv); err != nil {
+		t.Fatal(err)
+	}
+	if opened != "t3code://pair?x=1" {
+		t.Errorf("should open the app link here, opened %q", opened)
+	}
+	if srv.ran("(interactive)") {
+		t.Error("must not also show a QR code: the code works once")
 	}
 }

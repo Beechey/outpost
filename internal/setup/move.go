@@ -16,10 +16,13 @@ import (
 // T3 threads and projects, and agent history and settings (see manifest.go).
 // The new server takes over as the same T3 environment. Safe to re-run if it
 // stops partway. yes skips the questions; access is how devices reach the new
-// server, and swap the swap it gets, as the user typed it ("" asks, unless yes).
-func Move(ctx context.Context, old, dst remote.Host, yes bool, access Access, swap string) error {
+// server, and swap and name what it gets, as the user typed them ("" asks, unless yes).
+func Move(ctx context.Context, old, dst remote.Host, yes bool, access Access, swap, name string) error {
 	if old.String() == dst.String() {
 		return errors.New("the old and new server are the same")
+	}
+	if err := checkName(name); err != nil {
+		return err
 	}
 	if yes && swap == "" {
 		swap = "0"
@@ -64,7 +67,12 @@ func Move(ctx context.Context, old, dst remote.Host, yes bool, access Access, sw
 			}
 			return confirmMove(ctx, old, dst)
 		}},
-		{"Installing on " + dst.String() + " (3-5 minutes)", func(ctx context.Context) error { return install(ctx, dst, admin, swap) }},
+		{"Installing on " + dst.String() + " (3-5 minutes)", func(ctx context.Context) error {
+			if err := nameServer(ctx, dst, admin, name, admin != DevUser && !yes); err != nil {
+				return err
+			}
+			return install(ctx, dst, admin, swap)
+		}},
 		{"Moving your work", func(ctx context.Context) error {
 			if alreadyMoved {
 				ui.Check("Already moved", "finishing the remaining steps")
