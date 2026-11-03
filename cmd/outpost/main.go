@@ -38,14 +38,23 @@ func rootCmd() *cobra.Command {
 			"Servers are written as an IP address or hostname, with :port if SSH isn't on 22.\n" +
 			"Leave one out to pick from the servers outpost has set up before.",
 		SilenceUsage: true,
+		Args:         cobra.NoArgs,
+		// In a terminal, plain `outpost` opens the menu; elsewhere it shows this help.
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if !interactive() {
+				return cmd.Help()
+			}
+			return menu(cmd.Context())
+		},
 	}
-	root.AddCommand(setupCmd(), statusCmd(), accessCmd(), pairCmd(), loginCmd(), swapCmd(), renameCmd(), updateCmd(), backupCmd(), moveCmd(), listCmd(), forgetCmd(), upgradeCmd())
+	root.AddCommand(setupCmd(), statusCmd(), addressCmd(), accessCmd(), gatewayCmd(), pairCmd(), loginCmd(), swapCmd(), renameCmd(), updateCmd(), backupCmd(), moveCmd(), listCmd(), forgetCmd(), upgradeCmd())
 	return root
 }
 
 func setupCmd() *cobra.Command {
 	var access accessFlags
 	var swap, name string
+	var gw gatewayFlags
 	cmd := &cobra.Command{
 		Use:   "setup [server]",
 		Short: "Prepare a fresh Ubuntu 24.04 server, or repair an existing one",
@@ -55,11 +64,14 @@ func setupCmd() *cobra.Command {
 			"Safe to re-run: finished steps are skipped, and a server already in use gets a\n" +
 			"health check instead of a reboot.\n\n" +
 			"A server without swap gets the choice of adding some; --swap answers for you.\n" +
-			"A fresh server is asked for a name, shown in T3 Code; --name answers for you.",
+			"A fresh server is asked for a name, shown in T3 Code; --name answers for you.\n" +
+			"It also asks whether projects should get private HTTPS addresses on your tailnet;\n" +
+			"--gateway answers for you.",
 		Example: "  outpost setup 203.0.113.7\n" +
 			"  outpost setup 203.0.113.7 --tailscale    # tailnet only, no T3 Connect slot\n" +
 			"  outpost setup 203.0.113.7 --swap 4       # add 4 GB of swap without asking\n" +
-			"  outpost setup 203.0.113.7 --name tars    # name it tars without asking\n" +
+			"  outpost setup 203.0.113.7 --name devbox    # name it devbox without asking\n" +
+			"  outpost setup 203.0.113.7 --gateway tailscale   # HTTPS names for projects\n" +
 			"  outpost setup my-home-server.local:2222\n" +
 			"  outpost setup                            # pick a server you've set up before",
 		Args: cobra.MaximumNArgs(1),
@@ -68,7 +80,11 @@ func setupCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := setup.Setup(cmd.Context(), srv, access.value(), swap, name); err != nil {
+			opts, err := gw.value()
+			if err != nil {
+				return err
+			}
+			if err := setup.Setup(cmd.Context(), srv, access.value(), swap, name, opts); err != nil {
 				return err
 			}
 			_ = servers.Remember(srv) // only for the list next time
@@ -78,6 +94,7 @@ func setupCmd() *cobra.Command {
 	access.add(cmd)
 	addSwapFlag(cmd, &swap)
 	addNameFlag(cmd, &name)
+	gw.add(cmd, true)
 	return cmd
 }
 
@@ -179,18 +196,23 @@ func swapCmd() *cobra.Command {
 
 func renameCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "rename SERVER NAME",
+		Use:   "rename [server] [name]",
 		Short: "Rename a server, in Tailscale too",
 		Long: "Sets the server's hostname, keeps it across reboots, and renames it in Tailscale.\n" +
-			"Use lowercase letters, numbers and hyphens.",
-		Example: "  outpost rename 203.0.113.7 tars",
-		Args:    cobra.ExactArgs(2),
+			"Use lowercase letters, numbers and hyphens. Leave out the name to be asked.",
+		Example: "  outpost rename 203.0.113.7 devbox\n" +
+			"  outpost rename                            # pick the server, then type the name",
+		Args: cobra.MaximumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			srv, err := servers.Parse(args[0])
+			srv, err := server(cmd.Context(), args, 0, "Which server should outpost rename?")
 			if err != nil {
 				return err
 			}
-			return setup.Rename(cmd.Context(), srv, args[1])
+			name := ""
+			if len(args) > 1 {
+				name = args[1]
+			}
+			return setup.Rename(cmd.Context(), srv, name)
 		},
 	}
 }

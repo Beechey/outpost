@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"charm.land/lipgloss/v2"
 	"github.com/dustin/go-humanize"
@@ -81,6 +82,7 @@ func Move(ctx context.Context, old, dst remote.Host, yes bool, access Access, sw
 			return transfer(ctx, from, to, sv)
 		}},
 		{"Logins on " + dst.String(), func(ctx context.Context) error { return runLogins(ctx, to, access) }},
+		{"Gateway on " + dst.String(), func(ctx context.Context) error { return moveGateway(ctx, from, to, yes) }},
 		// A first move reboots to prove the new server starts by itself; a re-run may find agents at work there.
 		{"Final check", func(ctx context.Context) error { return finalCheck(ctx, to, !(alreadyMoved && inUse)) }},
 	})
@@ -106,6 +108,9 @@ func printSurvey(sv survey, alreadyMoved bool) {
 	row("Code", plural(sv.projects, "folder")+" in ~/code, uncommitted work and worktrees included")
 	row("T3 Code", "threads, projects and settings")
 	row("Agents", plural(sv.sessions, "Claude or Codex session")+", plus your CLAUDE.md, skills and settings")
+	if slices.Contains(sv.paths, ".outpost") {
+		row("Gateway", "your projects' names, and the certificate your devices trust")
+	}
 	if sv.size != "" {
 		row("Total", sv.size+", not counting node_modules")
 	}

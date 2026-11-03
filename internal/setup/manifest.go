@@ -9,8 +9,10 @@ import (
 // and every shell command that depends on it is built from it. Paths are
 // relative to the dev user's home.
 
-// movePaths is what a move carries: code, T3's data, and agent history and settings.
-var movePaths = []string{"code", ".t3/userdata", ".t3/worktrees", ".claude", ".claude.json", ".codex", ".gitconfig"}
+// movePaths is what a move carries: code, T3's data, agent history and
+// settings, and outpost's own files on the server, such as the gateway's names
+// and certificate authority, so devices stay trusted on the new server.
+var movePaths = []string{"code", ".t3/userdata", ".t3/worktrees", ".claude", ".claude.json", ".codex", ".gitconfig", ".outpost"}
 
 // moveExcludes is never copied: logins (approved again on the new server),
 // T3's per-process lock files and logs, and dependencies (reinstalled on demand).

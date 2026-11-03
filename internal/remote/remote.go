@@ -75,7 +75,12 @@ func (s Server) String() string {
 	return s.Addr + ":" + strconv.Itoa(s.Port)
 }
 
-var baseOpts = []string{"-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=10"}
+// baseOpts reuse one connection per server and user for a minute, so the many
+// short commands a status or flow runs don't each pay for a new SSH handshake.
+var baseOpts = []string{"-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=10",
+	"-o", "ControlMaster=auto", "-o", "ControlPath=~/.ssh/outpost-%C", "-o", "ControlPersist=60",
+	// A connection to a server that went away (say, rebooting) gives up in seconds, not minutes.
+	"-o", "ServerAliveInterval=5", "-o", "ServerAliveCountMax=3"}
 
 func (s Server) sshArgs(extra ...string) []string {
 	args := slices.Clone(baseOpts)

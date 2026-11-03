@@ -161,7 +161,7 @@ func TestSetupAsksForSwap(t *testing.T) {
 	srv := roomy(newFake("fresh", "root").healthy())
 	answer(t, "", "6") // keep the name, then 6 GB of swap
 
-	if err := Setup(ctx, srv, AccessUnset, "", ""); err != nil {
+	if err := Setup(ctx, srv, AccessUnset, "", "", GatewayOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if !addsSwap(srv, 6) {
@@ -211,13 +211,13 @@ func TestMoveConfirmedAtPrompt(t *testing.T) {
 func TestMoveAsksForAName(t *testing.T) {
 	ctx := testEnv(t)
 	old, dst := movable("old"), newFake("new", "root").healthy()
-	answer(t, "yes", "tars", "0") // move, name it tars, no swap
+	answer(t, "yes", "devbox", "0") // move, name it devbox, no swap
 
 	if err := Move(ctx, old, dst, false, AccessUnset, "", ""); err != nil {
 		t.Fatal(err)
 	}
-	if !dst.ran("hostnamectl set-hostname tars") {
-		t.Error("the new server should be named tars")
+	if !dst.ran("hostnamectl set-hostname devbox") {
+		t.Error("the new server should be named devbox")
 	}
 }
 
@@ -310,10 +310,26 @@ func TestRenameASetUpServer(t *testing.T) {
 	ctx := testEnv(t)
 	srv := newFake("box", DevUser)
 
-	if err := Rename(ctx, srv, "tars"); err != nil {
+	if err := Rename(ctx, srv, "devbox"); err != nil {
 		t.Fatal(err)
 	}
-	if !srv.ran("dev: sudo bash -c") || !srv.ran("hostnamectl set-hostname tars") || !srv.ran("tailscale set --hostname=tars") {
+	if !srv.ran("dev: sudo bash -c") || !srv.ran("hostnamectl set-hostname devbox") || !srv.ran("tailscale set --hostname=devbox") {
 		t.Error("should rename the server and Tailscale, as dev with sudo")
+	}
+}
+
+func TestRenameAsksForName(t *testing.T) {
+	ctx := testEnv(t)
+	s := answer(t, "devbox")
+	srv := onConnect("box")
+	if err := Rename(ctx, srv, ""); err != nil {
+		t.Fatal(err)
+	}
+	if len(s.asked) != 1 || !srv.ran("hostnamectl set-hostname devbox") {
+		t.Errorf("should ask, then rename: asked %q", s.asked)
+	}
+	answer(t) // no terminal
+	if err := Rename(ctx, onConnect("box"), ""); err == nil || !strings.Contains(err.Error(), "outpost rename box NAME") {
+		t.Errorf("without a terminal, want the command to type, got %v", err)
 	}
 }

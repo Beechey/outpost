@@ -15,7 +15,7 @@ func TestSetupFreshServer(t *testing.T) {
 	ctx := testEnv(t)
 	srv := newFake("fresh", "root").healthy()
 
-	if err := Setup(ctx, srv, AccessUnset, "", ""); err != nil {
+	if err := Setup(ctx, srv, AccessUnset, "", "", GatewayOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if !srv.ran("root: install script") {
@@ -30,7 +30,7 @@ func TestSetupCopiesKeyWhenNeeded(t *testing.T) {
 	ctx := testEnv(t)
 	srv := newFake("fresh").healthy() // nobody can log in yet
 
-	if err := Setup(ctx, srv, AccessUnset, "", ""); err != nil {
+	if err := Setup(ctx, srv, AccessUnset, "", "", GatewayOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if !srv.ran("ssh-copy-id root") {
@@ -42,7 +42,7 @@ func TestSetupServerInUseSkipsReboot(t *testing.T) {
 	ctx := testEnv(t)
 	srv := newFake("busy", DevUser).healthy().on(cmdT3Installed, "true", nil)
 
-	if err := Setup(ctx, srv, AccessUnset, "", ""); err != nil {
+	if err := Setup(ctx, srv, AccessUnset, "", "", GatewayOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if srv.ran("systemctl reboot") {
@@ -57,7 +57,7 @@ func TestSetupRefusesRetiredServer(t *testing.T) {
 	ctx := testEnv(t)
 	srv := newFake("old", DevUser).healthy().on(cmdMovedTo, "new:22\n", nil)
 
-	err := Setup(ctx, srv, AccessUnset, "", "")
+	err := Setup(ctx, srv, AccessUnset, "", "", GatewayOptions{})
 	if err == nil || !strings.Contains(err.Error(), "retired") {
 		t.Fatalf("want a retired-server error, got %v", err)
 	}
@@ -74,7 +74,7 @@ func TestSetupReportsServicesThatDontStart(t *testing.T) {
 	srv := newFake("broken", DevUser).on(cmdT3Installed, "true", nil).
 		on(cmdServices, "docker active\ntailscaled active\nT3 failed\n", nil)
 
-	err := Setup(ctx, srv, AccessUnset, "", "")
+	err := Setup(ctx, srv, AccessUnset, "", "", GatewayOptions{})
 	if err == nil || !strings.Contains(err.Error(), "T3 is failed") {
 		t.Fatalf("want T3 named as not running, got %v", err)
 	}
@@ -182,7 +182,7 @@ func TestSetupTailscaleMode(t *testing.T) {
 	ctx := testEnv(t)
 	srv := newFake("fresh", "root").healthy().on(t3Logins[AccessTailscale].Check, "", errors.New("not yet"))
 
-	if err := Setup(ctx, srv, AccessTailscale, "", ""); err != nil {
+	if err := Setup(ctx, srv, AccessTailscale, "", "", GatewayOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if !srv.ran("t3 up --lan --no-connect") || !srv.ran("t3 pair --tailscale") {
@@ -197,7 +197,7 @@ func TestSetupKeepsTailscaleOnRerun(t *testing.T) {
 	ctx := testEnv(t)
 	srv := newFake("busy", DevUser).healthy() // every check passes: already on the tailnet only
 
-	if err := Setup(ctx, srv, AccessUnset, "", ""); err != nil {
+	if err := Setup(ctx, srv, AccessUnset, "", "", GatewayOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if srv.ran("t3 up") {
@@ -209,7 +209,7 @@ func TestSetupSwitchesToConnect(t *testing.T) {
 	ctx := testEnv(t)
 	srv := newFake("busy", DevUser).healthy().on(t3Logins[AccessConnect].Check, "", errors.New("off"))
 
-	if err := Setup(ctx, srv, AccessConnect, "", ""); err != nil {
+	if err := Setup(ctx, srv, AccessConnect, "", "", GatewayOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if !srv.ran("t3 up --connect --no-lan") {
@@ -257,7 +257,7 @@ func TestSetupAddsSwapWhenChosen(t *testing.T) {
 	ctx := testEnv(t)
 	srv := roomy(newFake("fresh", "root").healthy())
 
-	if err := Setup(ctx, srv, AccessUnset, "4", ""); err != nil {
+	if err := Setup(ctx, srv, AccessUnset, "4", "", GatewayOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if !addsSwap(srv, 4) {
@@ -270,7 +270,7 @@ func TestSetupAddsNoSwapUnlessChosen(t *testing.T) {
 		ctx := testEnv(t)
 		srv := roomy(newFake("fresh", "root").healthy())
 
-		if err := Setup(ctx, srv, AccessUnset, gb, ""); err != nil {
+		if err := Setup(ctx, srv, AccessUnset, gb, "", GatewayOptions{}); err != nil {
 			t.Fatal(err)
 		}
 		if madeSwap(srv) {
@@ -283,7 +283,7 @@ func TestSetupKeepsExistingSwap(t *testing.T) {
 	ctx := testEnv(t)
 	srv := newFake("busy", DevUser).healthy().on(memoryCmd, "ram 4\nswapkb 2097148\nfile 2\ndisk 50\n", nil)
 
-	if err := Setup(ctx, srv, AccessUnset, "8", ""); err != nil {
+	if err := Setup(ctx, srv, AccessUnset, "8", "", GatewayOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if madeSwap(srv) {
@@ -295,7 +295,7 @@ func TestSetupRefusesSwapThatDoesntFit(t *testing.T) {
 	ctx := testEnv(t)
 	srv := newFake("small", "root").healthy().on(memoryCmd, "ram 2\nswapkb 0\nfile 0\ndisk 14\n", nil)
 
-	err := Setup(ctx, srv, AccessUnset, "8", "")
+	err := Setup(ctx, srv, AccessUnset, "8", "", GatewayOptions{})
 	if err == nil || !strings.Contains(err.Error(), "doesn't fit") {
 		t.Fatalf("want a doesn't-fit error, got %v", err)
 	}
@@ -454,13 +454,13 @@ func TestSetupNamesTheServerFirst(t *testing.T) {
 	ctx := testEnv(t)
 	srv := newFake("fresh", "root").healthy()
 
-	if err := Setup(ctx, srv, AccessUnset, "", "tars"); err != nil {
+	if err := Setup(ctx, srv, AccessUnset, "", "devbox", GatewayOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	// T3 Connect keeps the name it first sees, so the rename comes before the install and logins.
 	named, installed := -1, -1
 	for i, c := range srv.cmds {
-		if named < 0 && strings.Contains(c, "hostnamectl set-hostname tars") {
+		if named < 0 && strings.Contains(c, "hostnamectl set-hostname devbox") {
 			named = i
 		}
 		if installed < 0 && strings.Contains(c, "install script") {
@@ -468,7 +468,7 @@ func TestSetupNamesTheServerFirst(t *testing.T) {
 		}
 	}
 	if named < 0 || installed < 0 || named > installed {
-		t.Errorf("should rename to tars before installing (rename at %d, install at %d)", named, installed)
+		t.Errorf("should rename to devbox before installing (rename at %d, install at %d)", named, installed)
 	}
 }
 
@@ -476,7 +476,7 @@ func TestSetupRefusesABadName(t *testing.T) {
 	ctx := testEnv(t)
 	srv := newFake("fresh", "root").healthy()
 
-	if err := Setup(ctx, srv, AccessUnset, "", "My Server"); err == nil || !strings.Contains(err.Error(), "can't be a server name") {
+	if err := Setup(ctx, srv, AccessUnset, "", "My Server", GatewayOptions{}); err == nil || !strings.Contains(err.Error(), "can't be a server name") {
 		t.Fatalf("want a bad-name error, got %v", err)
 	}
 	if len(srv.cmds) > 0 {
@@ -489,7 +489,7 @@ func TestSetupRerunKeepsTheName(t *testing.T) {
 	srv := newFake("busy", DevUser).healthy()
 	asked := answer(t)
 
-	if err := Setup(ctx, srv, AccessUnset, "", ""); err != nil {
+	if err := Setup(ctx, srv, AccessUnset, "", "", GatewayOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if srv.ran("hostnamectl") || slices.Contains(asked.asked, "What should this server be called?") {

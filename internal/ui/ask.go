@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strings"
 
+	"charm.land/bubbles/v2/key"
 	"charm.land/huh/v2"
 	"github.com/charmbracelet/x/term"
 )
@@ -18,6 +20,8 @@ type Asker interface {
 	Choose(ctx context.Context, title string, options []Option, current string) (string, error)
 	// Input asks for text that validate accepts.
 	Input(ctx context.Context, title, description, placeholder string, validate func(string) error) (string, error)
+	// Secret asks for text that isn't shown as it's typed, such as an API key.
+	Secret(ctx context.Context, title, description string) (string, error)
 }
 
 // An Option is one answer to Choose.
@@ -48,7 +52,8 @@ func (Terminal) Choose(ctx context.Context, title string, options []Option, curr
 	for _, o := range options {
 		opts = append(opts, huh.NewOption(o.Label, o.Value))
 	}
-	err := run(ctx, huh.NewSelect[string]().Title(title).Options(opts...).Value(&current))
+	// In a list, ← goes back too: it has no other use there.
+	err := run(ctx, huh.NewSelect[string]().Title(title).Options(opts...).Value(&current), "left")
 	return current, err
 }
 
@@ -58,11 +63,32 @@ func (Terminal) Input(ctx context.Context, title, description, placeholder strin
 	return answer, err
 }
 
-func run(ctx context.Context, field huh.Field) error {
+func (Terminal) Secret(ctx context.Context, title, description string) (string, error) {
+	answer := ""
+	notEmpty := func(s string) error {
+		if strings.TrimSpace(s) == "" {
+			return errors.New("paste it here, or press Ctrl-C")
+		}
+		return nil
+	}
+	err := run(ctx, huh.NewInput().Title(title).Description(description).EchoMode(huh.EchoModePassword).Validate(notEmpty).Value(&answer))
+	return strings.TrimSpace(answer), err
+}
+
+// Pause waits for Enter (or Esc), so what's on screen stays in view until the user moves on.
+func Pause(ctx context.Context, label string) {
+	_ = run(ctx, huh.NewNote().Next(true).NextLabel(label), "left")
+}
+
+// run asks one question. Esc goes back, as do any extra keys; Ctrl-C too.
+// All of them come back as ErrCancelled.
+func run(ctx context.Context, field huh.Field, back ...string) error {
 	if !term.IsTerminal(os.Stdin.Fd()) {
 		return ErrNoTerminal
 	}
-	err := huh.NewForm(huh.NewGroup(field)).RunWithContext(ctx)
+	keys := huh.NewDefaultKeyMap()
+	keys.Quit = key.NewBinding(key.WithKeys(append([]string{"ctrl+c", "esc"}, back...)...))
+	err := huh.NewForm(huh.NewGroup(field)).WithKeyMap(keys).RunWithContext(ctx)
 	if errors.Is(err, huh.ErrUserAborted) {
 		return ErrCancelled
 	}
