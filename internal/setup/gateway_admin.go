@@ -243,8 +243,7 @@ var pickAdmin = func(ctx context.Context, d dev, c gatewayConfig, yes, repair bo
 		if err := saveKey(strings.TrimSpace(key)); err != nil {
 			return nil, fmt.Errorf("keep the key: %w", err)
 		}
-		path, _ := keyFile()
-		ui.Check("Tailscale API key", "kept in "+path)
+		ui.Check("Tailscale API key", "kept on this computer, for adding projects and moves")
 		return apiAdmin{api, yes}, nil
 	}
 }

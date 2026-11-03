@@ -1,17 +1,22 @@
 # How outpost works
 
-What outpost does to a server, why, and what each command changes. It follows the same order as the [guide](guide.md): set up, live with it, move on.
+What outpost does to a server, why, and what each command changes. It follows the same order as the [guide](guide.md): set up, live with it, open projects from your devices, move on.
 
 ## The shape of a run
 
-outpost runs on your laptop and drives the server over your normal `ssh`, so your keys, agent and `~/.ssh/config` all apply. Nothing is installed on your laptop besides the `outpost` binary, and nothing of outpost's runs on the server between commands: the server looks after itself.
+outpost runs on your laptop and drives the server over your normal `ssh`, so your keys, agent and `~/.ssh/config` all apply. One SSH connection is reused for all of a command's steps. Nothing is installed on your laptop besides the `outpost` binary (and, if you give it one, a Tailscale API key in its config folder), and nothing of outpost's runs on the server between commands: the server looks after itself.
 
 ```mermaid
 flowchart LR
   L[Your laptop<br/>outpost] -- ssh --> S[Server<br/>bootstrap.sh as root]
+  L -. Tailscale API .-> TN[Your tailnet<br/>tag, Services, DNS]
   S --> D[dev user<br/>T3 Code, Claude Code, gh]
+  S --> G[Gateway<br/>HTTPS for each project]
   D -- T3 Connect or tailnet --> P[T3 Code on your<br/>laptop, phone, browser]
+  G -- tailnet --> B[Your projects in the<br/>browser on any device]
 ```
+
+Plain `outpost` opens a menu over the same commands: it reads the server's status once, shows it as a card, and runs whichever command you pick, asking what that command would.
 
 ## Setting up
 
@@ -22,7 +27,7 @@ flowchart LR
 3. **Install.** If the server has no swap, shows its memory and free disk and asks how much to add (`--swap` answers in advance), then makes the swap file. Then uploads `bootstrap.sh` to a private temporary file and runs it as root. It's safe to re-run: each part checks before it changes anything.
 4. **Logins.** Each login is skipped if it's already done, so re-runs only ask for what's missing.
 5. **Gateway.** On a server that hasn't answered yet, asks whether projects should get HTTPS addresses, and which names (see [below](#the-gateway)). On one that has, checks the gateway and repairs it.
-6. **Final check.** Reboots and waits for the server to come back, then confirms T3, Docker and Tailscale are running. A server that already runs T3 may have agents working, so it gets the health check without the reboot.
+6. **Final check.** Reboots and waits for the server to come back, then confirms T3, Docker and Tailscale are running, and the gateway if it's on. A server that already runs T3 may have agents working, so it gets the health check without the reboot.
 
 ## What gets installed
 
@@ -60,7 +65,8 @@ Each command after setup logs in as `dev`, so it needs a server outpost set up. 
 
 | Command | On the server |
 |---|---|
-| `status` | Reads memory, swap and disk from `/proc/meminfo` and `df`, `t3 status --json` for access, `systemctl is-active` for the services, each login's own status check, and `/var/run/reboot-required`. Changes nothing. |
+| `outpost` | The menu: picks a server, reads its status like `status`, and runs the chosen command. |
+| `status` | Reads memory, swap and disk from `/proc/meminfo` and `df`, `t3 status --json` for access, `systemctl is-active` for the services, each login's own status check, `/var/run/reboot-required`, and the gateway's settings, services and published names. Changes nothing. |
 | `access` | Runs `t3 up --connect --no-lan` or `t3 up --lan --no-connect` (then `t3 pair --tailscale`, whose `t3code://` link outpost opens here, or whose QR code it shows for another device), which turns the new way on and the old one off. No reinstall, no reboot. |
 | `login` | Runs the same sign-in as setup for the named account, even if its status check passes, since a login can look valid after it has expired. With no account, signs in to each one whose check fails. |
 | `swap` | As root: turns `/swapfile` off, removes it and its `/etc/fstab` line, then makes, turns on and records one of the new size. Swap from elsewhere, such as a provider's partition, is left alone. Free disk counts the space the old file gives back, and 10 GB always stays free. |
@@ -68,6 +74,7 @@ Each command after setup logs in as `dev`, so it needs a server outpost set up. 
 | `gateway add` / `remove` | Checks the project's name, ports and paths, then publishes or removes its names and checks each answers, which also has Tailscale make a new name's certificate. With your own domain, Caddy reloads only if the new config validates. |
 | `gateway trust` | Copies the gateway's root certificate to this computer and adds it to the system's trusted roots, asking for your password. On a Mac it also adds `security.enterprise_roots.enabled` to the `user.js` of each Firefox-based browser profile (Firefox, Zen, LibreWolf…), so they trust what the Mac trusts, unless the profile already sets it. |
 | `address` | Reads T3's address and the gateway's routes. Changes nothing. |
+| `rename` | Sets the hostname, keeps it across reboots (`/etc/hosts`, and cloud-init told to leave it), and renames the server in Tailscale. |
 | `update` | `t3 update --yes`, which restarts T3 on the new version; `claude update`; then `apt-get update` and `upgrade`, keeping config files you changed. |
 | `backup` | See [below](#how-a-backup-works). |
 

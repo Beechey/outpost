@@ -811,9 +811,9 @@ func describeGateway(c gatewayConfig, rs []route) string {
 func printGateway(h remote.Host, c gatewayConfig, rs []route) {
 	lipgloss.Println("")
 	if len(rs) == 0 {
-		ui.Check("Gateway", c.Mode.String()+" is ready. Give a project a name: outpost gateway add "+h.String()+" PROJECT PORT")
+		ui.Check("Gateway", "ready: "+c.Mode.String()+". Give a project an address: outpost gateway add "+h.String()+" PROJECT PORT")
 	} else {
-		ui.Check("Gateway", c.Mode.String())
+		ui.Check("Gateway", "ready: "+c.Mode.String())
 		for _, r := range rs {
 			lipgloss.Println("    " + padRight(r.Name, 18) + ui.Accent.Render(c.url(r)))
 		}
